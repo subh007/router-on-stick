@@ -1,0 +1,9 @@
+module router {
+    yang-version 1;
+    namespace "urn:opendaylight:params:xml:ns:yang:router";
+    prefix "router";
+
+    revision "2015-01-05" {
+        description "Initial revision of router model";
+    }
+}

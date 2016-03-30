@@ -1,0 +1,35 @@
+module router-impl {
+    yang-version 1;
+    namespace "urn:opendaylight:params:xml:ns:yang:router:impl";
+    prefix "router-impl";
+
+    import config { prefix config; revision-date 2013-04-05; }
+    import opendaylight-md-sal-binding { prefix md-sal-binding; revision-date 2013-10-28;}
+
+    description
+        "Service definition for router project";
+
+    revision "2014-12-10" {
+        description
+            "Initial revision";
+    }
+
+    identity router-impl {
+        base config:module-type;
+        config:java-name-prefix RouterImpl;
+    }
+
+    augment "/config:modules/config:module/config:configuration" {
+        case router-impl {
+            when "/config:modules/config:module/config:type = 'router-impl'";
+            container broker {
+                uses config:service-ref {
+                    refine type {
+                        mandatory true;
+                        config:required-identity md-sal-binding:binding-broker-osgi-registry;
+                    }
+                }
+            }
+        }
+    }
+}
