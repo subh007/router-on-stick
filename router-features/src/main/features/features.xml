@@ -14,6 +14,7 @@ and is available at http://www.eclipse.org/legal/epl-v10.html
   <repository>mvn:org.opendaylight.mdsal.model/features-mdsal-model/{{VERSION}}/xml/features</repository>
   <repository>mvn:org.opendaylight.controller/features-mdsal/{{VERSION}}/xml/features</repository>
   <repository>mvn:org.opendaylight.netconf/features-restconf/{{VERSION}}/xml/features</repository>
+  <repository>mvn:org.opendaylight.openflowplugin/features-openflowplugin-li/{{VERSION}}/xml/features</repository>
   <feature name='odl-router-api' version='${project.version}' description='OpenDaylight :: hello :: api '>
     <feature version='${mdsal.model.version}'>odl-mdsal-models</feature>
     <bundle>mvn:org.subh.app/router-api/{{VERSION}}</bundle>
@@ -21,6 +22,7 @@ and is available at http://www.eclipse.org/legal/epl-v10.html
   <feature name='odl-router-impl' version='${project.version}' description='OpenDaylight :: hello :: impl '>
     <feature version='${controller.mdsal.version}'>odl-mdsal-broker</feature>
     <feature version='${project.version}'>odl-router-api</feature>
+    <feature version='${openflowplugin.version}'>odl-openflowplugin-flow-services-li</feature>
     <bundle>mvn:org.subh.app/router-impl/{{VERSION}}</bundle>
     <configfile finalname="router-impl-default-config.xml">mvn:org.subh.app/router-impl/{{VERSION}}/xml/config</configfile>
   </feature>
