@@ -1,4 +1,7 @@
 package org.opendaylight.yang.gen.v1.urn.opendaylight.params.xml.ns.yang.router.impl.rev141210;
+
+import org.opendaylight.router.RouterProvider;
+
 public class RouterImplModule extends org.opendaylight.yang.gen.v1.urn.opendaylight.params.xml.ns.yang.router.impl.rev141210.AbstractRouterImplModule {
     public RouterImplModule(org.opendaylight.controller.config.api.ModuleIdentifier identifier, org.opendaylight.controller.config.api.DependencyResolver dependencyResolver) {
         super(identifier, dependencyResolver);
@@ -15,8 +18,10 @@ public class RouterImplModule extends org.opendaylight.yang.gen.v1.urn.opendayli
 
     @Override
     public java.lang.AutoCloseable createInstance() {
-        // TODO:implement
-        throw new java.lang.UnsupportedOperationException();
+
+        RouterProvider provider = new RouterProvider(getNotificationServiceDependency());
+        getBrokerDependency().registerProvider(provider);
+        return provider;
     }
 
 }
