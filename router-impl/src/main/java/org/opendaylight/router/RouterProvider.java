@@ -8,12 +8,17 @@
 
 package org.opendaylight.router;
 
+import java.net.InetAddress;
+import java.net.UnknownHostException;
 import java.util.Arrays;
 
 import org.opendaylight.controller.sal.binding.api.BindingAwareBroker.ProviderContext;
 import org.opendaylight.controller.sal.binding.api.BindingAwareProvider;
 import org.opendaylight.controller.sal.binding.api.NotificationProviderService;
+import org.opendaylight.yang.gen.v1.urn.opendaylight.packet.arp.rev140528.KnownHardwareType;
+import org.opendaylight.yang.gen.v1.urn.opendaylight.packet.arp.rev140528.KnownOperation;
 import org.opendaylight.yang.gen.v1.urn.opendaylight.packet.arp.rev140528.arp.packet.received.packet.chain.packet.ArpPacket;
+import org.opendaylight.yang.gen.v1.urn.opendaylight.packet.arp.rev140528.arp.packet.received.packet.chain.packet.ArpPacketBuilder;
 import org.opendaylight.yang.gen.v1.urn.opendaylight.packet.ethernet.rev140528.KnownEtherType;
 import org.opendaylight.yang.gen.v1.urn.opendaylight.packet.ethernet.rev140528.ethernet.packet.received.packet.chain.packet.EthernetPacket;
 import org.opendaylight.yang.gen.v1.urn.opendaylight.packet.ethernet.rev140528.ethernet.packet.received.packet.chain.packet.EthernetPacketBuilder;
@@ -47,12 +52,24 @@ public class RouterProvider implements BindingAwareProvider, AutoCloseable, Pack
 
     @Override
     public void onPacketReceived(PacketReceived packet) {
-        LOG.debug("reveived the packet :" + packet.toString());
+        LOG.debug("<<reveived the packet :>>" + packet.toString());
         byte[] rawPacket = packet.getPayload();
         try {
             EthernetPacket etherHeader = etherPacketDecoder(rawPacket);
             if(etherHeader.getEthertype() == KnownEtherType.Arp) {
                 LOG.debug("received the ARP packet.");
+
+                // create and populate the arpheader.
+                ArpPacket arpHeader = arpDecoder(Arrays.copyOfRange(rawPacket,
+                        ETHER_PACKET_HEADER_SIZE,
+                        ETHER_PACKET_HEADER_SIZE+ARP_PACKET_HEADER_SIZE));
+
+                if(arpHeader != null) {
+                    LOG.info("smac {} dmac {} sip {} dip {}", arpHeader.getSourceHardwareAddress(),
+                            arpHeader.getDestinationHardwareAddress(),
+                            arpHeader.getSourceProtocolAddress(),
+                            arpHeader.getDestinationProtocolAddress());
+                }
             }
         } catch(PacketSizeException ex) {
             LOG.debug("packet can't be decode.");
@@ -65,6 +82,8 @@ public class RouterProvider implements BindingAwareProvider, AutoCloseable, Pack
      * @return
      */
     private EthernetPacket etherPacketDecoder(byte[] data) throws PacketSizeException {
+        // TODO: Handler for the vlan tagged packet.
+
         EthernetPacketBuilder ethernetPacketBuilder = new EthernetPacketBuilder();
         if(data.length < ETHER_PACKET_HEADER_SIZE) {
             throw new PacketSizeException("packet is not sufficiently big to extract the header.");
@@ -78,8 +97,38 @@ public class RouterProvider implements BindingAwareProvider, AutoCloseable, Pack
     /**
      * This method return the ARP header info from the provided data.
      */
-    private ArpPacket arpDecoder(byte[] data) {
-        return null;
+    private ArpPacket arpDecoder(byte[] data) throws PacketSizeException{
+        ArpPacketBuilder arpBuilder = new ArpPacketBuilder();
+
+        if(data.length < ARP_PACKET_HEADER_SIZE) {
+            throw new PacketSizeException("packet is not sufficiently bit to extract the header.");
+        }
+
+        arpBuilder.setHardwareType(KnownHardwareType.forValue(PacketUtil.byteToInt(Arrays.copyOfRange(data, 0, 2))));
+        arpBuilder.setProtocolType(KnownEtherType.forValue(PacketUtil.byteToInt(Arrays.copyOfRange(data, 2, 4))));
+
+        arpBuilder.setOperation(KnownOperation.forValue(PacketUtil.byteToInt(Arrays.copyOfRange(data, 6, 8)))); //2 byte
+
+        if(arpBuilder.getHardwareType().equals(KnownHardwareType.Ethernet)) {
+            // retrieve the hex string for src and dst mac.
+            arpBuilder.setSourceHardwareAddress(PacketUtil.bytesToHexString(Arrays.copyOfRange(data, 8, 14))); //6 byte
+            arpBuilder.setDestinationHardwareAddress(PacketUtil.bytesToHexString(Arrays.copyOfRange(data, 18, 24))); // 6 byte
+        }
+
+        if(arpBuilder.getProtocolType().equals(KnownEtherType.Ipv4)) {
+            // decode IPv4 protocol address
+            LOG.debug("ready to retrieeve IPv4 address");
+            try {
+                arpBuilder.setSourceProtocolAddress(InetAddress.getByAddress(Arrays.copyOfRange(data, 14, 18)).getHostAddress());
+                arpBuilder.setDestinationProtocolAddress(InetAddress.getByAddress(Arrays.copyOfRange(data, 24, 28)).getHostAddress());
+            } catch(UnknownHostException ex) {
+                LOG.error("error : {}", ex.getMessage());
+            }
+
+        } else {
+            // decode IPv6 protocol address
+        }
+        return arpBuilder.build();
     }
 
 }
