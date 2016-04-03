@@ -58,7 +58,7 @@ public class RouterProvider implements BindingAwareProvider, AutoCloseable, Pack
 
     @Override
     public void onPacketReceived(PacketReceived packet) {
-        LOG.debug("<<reveived the packet :>>" + packet.toString());
+        LOG.debug("reveived the packet :");
         byte[] rawPacket = packet.getPayload();
         try {
             EthernetPacket etherHeader = etherPacketDecoder(rawPacket);
@@ -71,6 +71,7 @@ public class RouterProvider implements BindingAwareProvider, AutoCloseable, Pack
                         ETHER_PACKET_HEADER_SIZE+ARP_PACKET_HEADER_SIZE));
 
                 if(arpHeader != null) {
+                    LOG.info("in_port : {}", packet.getIngress().getValue());
                     LOG.info("smac {} dmac {} sip {} dip {}", arpHeader.getSourceHardwareAddress(),
                             arpHeader.getDestinationHardwareAddress(),
                             arpHeader.getSourceProtocolAddress(),
@@ -79,8 +80,7 @@ public class RouterProvider implements BindingAwareProvider, AutoCloseable, Pack
                     AddressMappingElem amElem = new AddressMappingElemBuilder()
                             .setIp(arpHeader.getSourceProtocolAddress())
                             .setMac(arpHeader.getSourceHardwareAddress())
-                            .setInPort((long) 1).build();  // temprory set to hardcoded value
-
+                            .setInPort(packet.getIngress()).build();
                     addressTable.put(amElem.getIp(), amElem);
                     LOG.info("address {}", addressTable);
                 }

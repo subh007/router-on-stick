@@ -20,4 +20,13 @@ and is available at http://www.eclipse.org/legal/epl-v10.html
   <packaging>bundle</packaging>
 
   <artifactId>router-api</artifactId>
+
+  <dependencies>
+    <dependency>
+        <groupId>org.opendaylight.controller.model</groupId>
+        <artifactId>model-inventory</artifactId>
+        <version>1.4.0-SNAPSHOT</version>
+    </dependency>
+  </dependencies>
+
 </project>

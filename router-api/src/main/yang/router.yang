@@ -3,6 +3,8 @@ module router {
     namespace "urn:opendaylight:params:xml:ns:yang:router";
     prefix "router";
 
+    import opendaylight-inventory {prefix inv;revision-date "2013-08-19";}
+
     revision "2015-01-05" {
         description "Initial revision of router model";
     }
@@ -20,7 +22,7 @@ module router {
 
         leaf in-port {
             description "host is connected to the in-port.";
-            type uint32;
+                type inv:node-connector-ref;
         }
     }
 }

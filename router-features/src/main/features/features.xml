@@ -18,6 +18,7 @@ and is available at http://www.eclipse.org/legal/epl-v10.html
   <repository>mvn:org.opendaylight.l2switch/features-l2switch/{{VERSION}}/xml/features</repository>
   <feature name='odl-router-api' version='${project.version}' description='OpenDaylight :: hello :: api '>
     <feature version='${mdsal.model.version}'>odl-mdsal-models</feature>
+    <bundle>mvn:org.opendaylight.controller.model/model-inventory/{{VERSION}}</bundle>
     <bundle>mvn:org.subh.app/router-api/{{VERSION}}</bundle>
   </feature>
   <feature name='odl-router-impl' version='${project.version}' description='OpenDaylight :: hello :: impl '>
