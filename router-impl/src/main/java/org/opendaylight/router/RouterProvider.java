@@ -11,6 +11,7 @@ package org.opendaylight.router;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.util.Arrays;
+import java.util.concurrent.ConcurrentHashMap;
 
 import org.opendaylight.controller.sal.binding.api.BindingAwareBroker.ProviderContext;
 import org.opendaylight.controller.sal.binding.api.BindingAwareProvider;
@@ -24,6 +25,8 @@ import org.opendaylight.yang.gen.v1.urn.opendaylight.packet.ethernet.rev140528.e
 import org.opendaylight.yang.gen.v1.urn.opendaylight.packet.ethernet.rev140528.ethernet.packet.received.packet.chain.packet.EthernetPacketBuilder;
 import org.opendaylight.yang.gen.v1.urn.opendaylight.packet.service.rev130709.PacketProcessingListener;
 import org.opendaylight.yang.gen.v1.urn.opendaylight.packet.service.rev130709.PacketReceived;
+import org.opendaylight.yang.gen.v1.urn.opendaylight.params.xml.ns.yang.router.rev150105.AddressMappingElem;
+import org.opendaylight.yang.gen.v1.urn.opendaylight.params.xml.ns.yang.router.rev150105.AddressMappingElemBuilder;
 import org.opendaylight.yangtools.concepts.ListenerRegistration;
 import org.opendaylight.yangtools.yang.binding.NotificationListener;
 import org.slf4j.Logger;
@@ -35,6 +38,7 @@ public class RouterProvider implements BindingAwareProvider, AutoCloseable, Pack
     private static final int ETHER_PACKET_HEADER_SIZE=14;
     private static final int ARP_PACKET_HEADER_SIZE=28;
     private ListenerRegistration<NotificationListener> listener;
+    private ConcurrentHashMap<String, AddressMappingElem> addressTable;
 
     public RouterProvider(NotificationProviderService notificationProviderService) {
         listener = notificationProviderService.registerNotificationListener(this);
@@ -43,6 +47,8 @@ public class RouterProvider implements BindingAwareProvider, AutoCloseable, Pack
     @Override
     public void onSessionInitiated(ProviderContext session) {
         LOG.info("HelloProvider Session Initiated");
+
+        addressTable = new ConcurrentHashMap<>();
     }
 
     @Override
@@ -69,6 +75,14 @@ public class RouterProvider implements BindingAwareProvider, AutoCloseable, Pack
                             arpHeader.getDestinationHardwareAddress(),
                             arpHeader.getSourceProtocolAddress(),
                             arpHeader.getDestinationProtocolAddress());
+
+                    AddressMappingElem amElem = new AddressMappingElemBuilder()
+                            .setIp(arpHeader.getSourceProtocolAddress())
+                            .setMac(arpHeader.getSourceHardwareAddress())
+                            .setInPort((long) 1).build();  // temprory set to hardcoded value
+
+                    addressTable.put(amElem.getIp(), amElem);
+                    LOG.info("address {}", addressTable);
                 }
             }
         } catch(PacketSizeException ex) {

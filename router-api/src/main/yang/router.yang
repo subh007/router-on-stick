@@ -6,4 +6,21 @@ module router {
     revision "2015-01-05" {
         description "Initial revision of router model";
     }
+
+    container address-mapping-elem {
+        leaf ip {
+            description "ip address of the node.";
+            type string;
+        }
+
+        leaf mac {
+            description "mac address of the node.";
+            type string;
+        }
+
+        leaf in-port {
+            description "host is connected to the in-port.";
+            type uint32;
+        }
+    }
 }
