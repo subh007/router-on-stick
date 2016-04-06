@@ -21,6 +21,9 @@ import org.opendaylight.yang.gen.v1.urn.opendaylight.packet.arp.rev140528.KnownO
 import org.opendaylight.yang.gen.v1.urn.opendaylight.packet.arp.rev140528.arp.packet.received.packet.chain.packet.ArpPacket;
 import org.opendaylight.yang.gen.v1.urn.opendaylight.packet.arp.rev140528.arp.packet.received.packet.chain.packet.ArpPacketBuilder;
 import org.opendaylight.yang.gen.v1.urn.opendaylight.packet.ethernet.rev140528.KnownEtherType;
+import org.opendaylight.yang.gen.v1.urn.opendaylight.packet.ethernet.rev140528.VlanId;
+import org.opendaylight.yang.gen.v1.urn.opendaylight.packet.ethernet.rev140528.ethernet.packet.fields.Header8021q;
+import org.opendaylight.yang.gen.v1.urn.opendaylight.packet.ethernet.rev140528.ethernet.packet.fields.Header8021qBuilder;
 import org.opendaylight.yang.gen.v1.urn.opendaylight.packet.ethernet.rev140528.ethernet.packet.received.packet.chain.packet.EthernetPacket;
 import org.opendaylight.yang.gen.v1.urn.opendaylight.packet.ethernet.rev140528.ethernet.packet.received.packet.chain.packet.EthernetPacketBuilder;
 import org.opendaylight.yang.gen.v1.urn.opendaylight.packet.service.rev130709.PacketProcessingListener;
@@ -36,9 +39,12 @@ public class RouterProvider implements BindingAwareProvider, AutoCloseable, Pack
 
     private static final Logger LOG = LoggerFactory.getLogger(RouterProvider.class);
     private static final int ETHER_PACKET_HEADER_SIZE=14;
+    private static final int VLAN_PACKET_HEADER_SIZE=4;
     private static final int ARP_PACKET_HEADER_SIZE=28;
     private ListenerRegistration<NotificationListener> listener;
     private ConcurrentHashMap<String, AddressMappingElem> addressTable;
+
+    private static String ROUTER_MAC_ADDRESS="10:20:30:40:50:60";
 
     public RouterProvider(NotificationProviderService notificationProviderService) {
         listener = notificationProviderService.registerNotificationListener(this);
@@ -85,6 +91,16 @@ public class RouterProvider implements BindingAwareProvider, AutoCloseable, Pack
                     LOG.info("address {}", addressTable);
                 }
             }
+            else if(etherHeader.getEthertype() == KnownEtherType.VlanTagged) {
+                LOG.debug("reveived vlan tagged packet.");
+
+                byte[] vlanHeaderData = Arrays.copyOfRange(rawPacket, ETHER_PACKET_HEADER_SIZE,
+                        ETHER_PACKET_HEADER_SIZE + VLAN_PACKET_HEADER_SIZE);
+
+                // decode the vlan header.
+                Header8021q vlanHeader = vlanDecoder(vlanHeaderData);
+                LOG.debug("vlan id : {}", vlanHeader.getVlan().getValue().intValue());
+            }
         } catch(PacketSizeException ex) {
             LOG.debug("packet can't be decode.");
         }
@@ -106,6 +122,18 @@ public class RouterProvider implements BindingAwareProvider, AutoCloseable, Pack
         byte[] ethernetHeaderData = Arrays.copyOfRange(data, 0, ETHER_PACKET_HEADER_SIZE);
         ethernetPacketBuilder.setEthertype(KnownEtherType.forValue(PacketUtil.byteToInt(Arrays.copyOfRange(ethernetHeaderData, 12,14))));
         return ethernetPacketBuilder.build();
+    }
+
+    private Header8021q vlanDecoder(byte[] data) throws PacketSizeException {
+        if (data.length < VLAN_PACKET_HEADER_SIZE) {
+            throw new PacketSizeException("vlan header can't be decoded.");
+        }
+
+        Header8021qBuilder vlanHeaderBuilder = new Header8021qBuilder();
+        int vlanID = PacketUtil.byteToInt(PacketUtil.getBitsFromBytes(Arrays.copyOfRange(data, 0, 2), 12));
+        vlanHeaderBuilder.setVlan(new VlanId(new Integer(vlanID)));
+        LOG.debug("Received packet from the vlan {}", vlanID);
+        return vlanHeaderBuilder.build();
     }
 
     /**

@@ -77,7 +77,6 @@ public class PacketUtil {
         }
 
         byte[] output = new byte[((bits-1) / 8) + 1];
-        System.out.println(output.length);
         int i=0;
         for(byte b : data) {
             bits -= 8;
