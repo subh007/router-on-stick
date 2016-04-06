@@ -70,4 +70,32 @@ public class PacketUtil {
         }
         return val;
     }
+
+    public static byte[] getBitsFromBytes(byte[] data, int bits) {
+        if (bits > data.length * 8) {
+            return null;
+        }
+
+        byte[] output = new byte[((bits-1) / 8) + 1];
+        System.out.println(output.length);
+        int i=0;
+        for(byte b : data) {
+            bits -= 8;
+            if (bits >= 0) {
+                output[output.length - i -1] = data[data.length - i -1];
+            } else {
+                output[output.length - i -1] = getBitsFromByte(data[data.length - i -1], (bits+8));
+            }
+            i++;
+        }
+        return output;
+    }
+
+    public static byte getBitsFromByte(byte data, int len) {
+        byte val = 0;
+        for (int i=0; i<8 && i<len; i++) {
+            val += (byte)((0x01 & (data >> i)) << i);
+        }
+        return val;
+    }
 }
