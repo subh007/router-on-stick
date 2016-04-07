@@ -31,6 +31,13 @@ and is available at http://www.eclipse.org/legal/epl-v10.html
             <name>binding-notification-broker</name>
           </notification-service>
 
+          <data-broker>
+            <type xmlns:binding="urn:opendaylight:params:xml:ns:yang:controller:md:sal:binding">
+                binding:binding-async-data-broker
+            </type>
+            <name>binding-data-broker</name>
+          </data-broker>
+
         </module>
       </modules>
     </data>

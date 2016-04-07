@@ -1,3 +1,4 @@
+
 package org.opendaylight.yang.gen.v1.urn.opendaylight.params.xml.ns.yang.router.impl.rev141210;
 
 import org.opendaylight.router.RouterProvider;
@@ -19,7 +20,8 @@ public class RouterImplModule extends org.opendaylight.yang.gen.v1.urn.opendayli
     @Override
     public java.lang.AutoCloseable createInstance() {
 
-        RouterProvider provider = new RouterProvider(getNotificationServiceDependency());
+        RouterProvider provider = new RouterProvider(getNotificationServiceDependency(),
+                getDataBrokerDependency());
         getBrokerDependency().registerProvider(provider);
         return provider;
     }

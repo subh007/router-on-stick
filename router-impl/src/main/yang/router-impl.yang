@@ -31,13 +31,22 @@ module router-impl {
                 }
             }
             container notification-service {
-				uses config:service-ref {
-					refine type {
-						mandatory true;
-						config:required-identity md-sal-binding:binding-notification-service;
-					}
-				}
-			}
+                uses config:service-ref {
+                    refine type {
+                        mandatory true;
+                        config:required-identity md-sal-binding:binding-notification-service;
+                    }
+                }
+            }
+
+            container data-broker {
+                uses config:service-ref {
+                    refine type {
+                        mandatory true;
+                        config:required-identity md-sal-binding:binding-async-data-broker;
+                    }
+                }
+            }
         }
     }
 }

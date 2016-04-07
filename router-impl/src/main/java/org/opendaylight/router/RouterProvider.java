@@ -13,6 +13,7 @@ import java.net.UnknownHostException;
 import java.util.Arrays;
 import java.util.concurrent.ConcurrentHashMap;
 
+import org.opendaylight.controller.md.sal.binding.api.DataBroker;
 import org.opendaylight.controller.sal.binding.api.BindingAwareBroker.ProviderContext;
 import org.opendaylight.controller.sal.binding.api.BindingAwareProvider;
 import org.opendaylight.controller.sal.binding.api.NotificationProviderService;
@@ -42,12 +43,14 @@ public class RouterProvider implements BindingAwareProvider, AutoCloseable, Pack
     private static final int VLAN_PACKET_HEADER_SIZE=4;
     private static final int ARP_PACKET_HEADER_SIZE=28;
     private ListenerRegistration<NotificationListener> listener;
+    private DataBroker dataBroker;
     private ConcurrentHashMap<String, AddressMappingElem> addressTable;
 
     private static String ROUTER_MAC_ADDRESS="10:20:30:40:50:60";
 
-    public RouterProvider(NotificationProviderService notificationProviderService) {
+    public RouterProvider(NotificationProviderService notificationProviderService, DataBroker broker) {
         listener = notificationProviderService.registerNotificationListener(this);
+        dataBroker = broker;
     }
 
     @Override
@@ -133,6 +136,7 @@ public class RouterProvider implements BindingAwareProvider, AutoCloseable, Pack
         int vlanID = PacketUtil.byteToInt(PacketUtil.getBitsFromBytes(Arrays.copyOfRange(data, 0, 2), 12));
         vlanHeaderBuilder.setVlan(new VlanId(new Integer(vlanID)));
         LOG.debug("Received packet from the vlan {}", vlanID);
+
         return vlanHeaderBuilder.build();
     }
 
