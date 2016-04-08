@@ -20,6 +20,7 @@ import org.opendaylight.controller.md.sal.common.api.data.LogicalDatastoreType;
 import org.opendaylight.controller.sal.binding.api.BindingAwareBroker.ProviderContext;
 import org.opendaylight.controller.sal.binding.api.BindingAwareProvider;
 import org.opendaylight.controller.sal.binding.api.NotificationProviderService;
+import org.opendaylight.yang.gen.v1.urn.opendaylight.flow.service.rev130819.SalFlowService;
 import org.opendaylight.yang.gen.v1.urn.opendaylight.inventory.rev130819.Nodes;
 import org.opendaylight.yang.gen.v1.urn.opendaylight.inventory.rev130819.nodes.Node;
 import org.opendaylight.yang.gen.v1.urn.opendaylight.packet.arp.rev140528.KnownHardwareType;
@@ -55,6 +56,7 @@ public class RouterProvider implements BindingAwareProvider, AutoCloseable, Pack
 
     private DataBroker dataBroker;
     private ConcurrentHashMap<String, AddressMappingElem> addressTable;
+    private SalFlowService salFlowService;
 
     private static String ROUTER_MAC_ADDRESS="10:20:30:40:50:60";
     private static InstanceIdentifier<Node> NODE_IID = InstanceIdentifier.builder(Nodes.class).child(Node.class).build();
@@ -63,12 +65,16 @@ public class RouterProvider implements BindingAwareProvider, AutoCloseable, Pack
         listener = notificationProviderService.registerNotificationListener(this);
         dataBroker = broker;
 
-        dataChangeListener = dataBroker.registerDataChangeListener(LogicalDatastoreType.OPERATIONAL, NODE_IID, new OFSwitchTracker(), DataChangeScope.BASE);
+        dataChangeListener = dataBroker.registerDataChangeListener(LogicalDatastoreType.OPERATIONAL,
+                NODE_IID,
+                new OFSwitchTracker(salFlowService),
+                DataChangeScope.BASE);
     }
 
     @Override
     public void onSessionInitiated(ProviderContext session) {
         LOG.info("HelloProvider Session Initiated");
+        salFlowService = session.getRpcService(SalFlowService.class);
         addressTable = new ConcurrentHashMap<>();
     }
 
@@ -79,6 +85,7 @@ public class RouterProvider implements BindingAwareProvider, AutoCloseable, Pack
 
         listener = null;
         dataChangeListener = null;
+        salFlowService = null;
     }
 
     @Override

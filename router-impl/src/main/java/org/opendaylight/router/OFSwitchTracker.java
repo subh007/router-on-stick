@@ -18,6 +18,8 @@ import org.opendaylight.yang.gen.v1.urn.opendaylight.action.types.rev131112.acti
 import org.opendaylight.yang.gen.v1.urn.opendaylight.action.types.rev131112.action.list.ActionBuilder;
 import org.opendaylight.yang.gen.v1.urn.opendaylight.flow.inventory.rev130819.FlowCapableNode;
 import org.opendaylight.yang.gen.v1.urn.opendaylight.flow.inventory.rev130819.tables.table.FlowBuilder;
+import org.opendaylight.yang.gen.v1.urn.opendaylight.flow.service.rev130819.SalFlowService;
+import org.opendaylight.yang.gen.v1.urn.opendaylight.flow.types.rev131026.Flow;
 import org.opendaylight.yang.gen.v1.urn.opendaylight.flow.types.rev131026.OutputPortValues;
 import org.opendaylight.yang.gen.v1.urn.opendaylight.flow.types.rev131026.flow.InstructionsBuilder;
 import org.opendaylight.yang.gen.v1.urn.opendaylight.flow.types.rev131026.instruction.instruction.WriteActionsCaseBuilder;
@@ -32,6 +34,11 @@ import org.slf4j.LoggerFactory;
 public class OFSwitchTracker implements DataChangeListener {
 
     private static final Logger LOG = LoggerFactory.getLogger(RouterProvider.class);
+    SalFlowService salFlowService;
+
+    public OFSwitchTracker(SalFlowService salFlowService) {
+        this.salFlowService = salFlowService;
+    }
 
     @Override
     public void onDataChanged(AsyncDataChangeEvent<InstanceIdentifier<?>, DataObject> change) {
@@ -49,6 +56,9 @@ public class OFSwitchTracker implements DataChangeListener {
     }
 
     public void installDefaultFlowRule(Node node) {
+    }
+
+    public static Flow getDefaultPuntToControllerFlow() {
 
         // Create Action to forward the packet to controller
         ActionBuilder actBuilder = new ActionBuilder();
@@ -83,6 +93,8 @@ public class OFSwitchTracker implements DataChangeListener {
                 .build()
                 )
         .setTableId((short)0);
+
+        return flowBuilder.build();
     }
 
 }
