@@ -14,9 +14,14 @@ import java.util.Arrays;
 import java.util.concurrent.ConcurrentHashMap;
 
 import org.opendaylight.controller.md.sal.binding.api.DataBroker;
+import org.opendaylight.controller.md.sal.binding.api.DataChangeListener;
+import org.opendaylight.controller.md.sal.common.api.data.AsyncDataBroker.DataChangeScope;
+import org.opendaylight.controller.md.sal.common.api.data.LogicalDatastoreType;
 import org.opendaylight.controller.sal.binding.api.BindingAwareBroker.ProviderContext;
 import org.opendaylight.controller.sal.binding.api.BindingAwareProvider;
 import org.opendaylight.controller.sal.binding.api.NotificationProviderService;
+import org.opendaylight.yang.gen.v1.urn.opendaylight.inventory.rev130819.Nodes;
+import org.opendaylight.yang.gen.v1.urn.opendaylight.inventory.rev130819.nodes.Node;
 import org.opendaylight.yang.gen.v1.urn.opendaylight.packet.arp.rev140528.KnownHardwareType;
 import org.opendaylight.yang.gen.v1.urn.opendaylight.packet.arp.rev140528.KnownOperation;
 import org.opendaylight.yang.gen.v1.urn.opendaylight.packet.arp.rev140528.arp.packet.received.packet.chain.packet.ArpPacket;
@@ -32,9 +37,11 @@ import org.opendaylight.yang.gen.v1.urn.opendaylight.packet.service.rev130709.Pa
 import org.opendaylight.yang.gen.v1.urn.opendaylight.params.xml.ns.yang.router.rev150105.AddressMappingElem;
 import org.opendaylight.yang.gen.v1.urn.opendaylight.params.xml.ns.yang.router.rev150105.AddressMappingElemBuilder;
 import org.opendaylight.yangtools.concepts.ListenerRegistration;
+import org.opendaylight.yangtools.yang.binding.InstanceIdentifier;
 import org.opendaylight.yangtools.yang.binding.NotificationListener;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
 
 public class RouterProvider implements BindingAwareProvider, AutoCloseable, PacketProcessingListener {
 
@@ -42,27 +49,36 @@ public class RouterProvider implements BindingAwareProvider, AutoCloseable, Pack
     private static final int ETHER_PACKET_HEADER_SIZE=14;
     private static final int VLAN_PACKET_HEADER_SIZE=4;
     private static final int ARP_PACKET_HEADER_SIZE=28;
+
     private ListenerRegistration<NotificationListener> listener;
+    private ListenerRegistration<DataChangeListener> dataChangeListener;
+
     private DataBroker dataBroker;
     private ConcurrentHashMap<String, AddressMappingElem> addressTable;
 
     private static String ROUTER_MAC_ADDRESS="10:20:30:40:50:60";
+    private static InstanceIdentifier<Node> NODE_IID = InstanceIdentifier.builder(Nodes.class).child(Node.class).build();
 
     public RouterProvider(NotificationProviderService notificationProviderService, DataBroker broker) {
         listener = notificationProviderService.registerNotificationListener(this);
         dataBroker = broker;
+
+        dataChangeListener = dataBroker.registerDataChangeListener(LogicalDatastoreType.OPERATIONAL, NODE_IID, new OFSwitchTracker(), DataChangeScope.BASE);
     }
 
     @Override
     public void onSessionInitiated(ProviderContext session) {
         LOG.info("HelloProvider Session Initiated");
-
         addressTable = new ConcurrentHashMap<>();
     }
 
     @Override
     public void close() throws Exception {
         this.listener.close();
+        dataChangeListener.close();
+
+        listener = null;
+        dataChangeListener = null;
     }
 
     @Override
