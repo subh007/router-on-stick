@@ -17,17 +17,21 @@ import org.opendaylight.yang.gen.v1.urn.opendaylight.action.types.rev131112.acti
 import org.opendaylight.yang.gen.v1.urn.opendaylight.action.types.rev131112.action.action.output.action._case.OutputActionBuilder;
 import org.opendaylight.yang.gen.v1.urn.opendaylight.action.types.rev131112.action.list.ActionBuilder;
 import org.opendaylight.yang.gen.v1.urn.opendaylight.flow.inventory.rev130819.FlowCapableNode;
+import org.opendaylight.yang.gen.v1.urn.opendaylight.flow.inventory.rev130819.FlowId;
 import org.opendaylight.yang.gen.v1.urn.opendaylight.flow.inventory.rev130819.tables.Table;
+import org.opendaylight.yang.gen.v1.urn.opendaylight.flow.inventory.rev130819.tables.TableKey;
+import org.opendaylight.yang.gen.v1.urn.opendaylight.flow.inventory.rev130819.tables.table.Flow;
 import org.opendaylight.yang.gen.v1.urn.opendaylight.flow.inventory.rev130819.tables.table.FlowBuilder;
+import org.opendaylight.yang.gen.v1.urn.opendaylight.flow.inventory.rev130819.tables.table.FlowKey;
 import org.opendaylight.yang.gen.v1.urn.opendaylight.flow.service.rev130819.AddFlowInputBuilder;
 import org.opendaylight.yang.gen.v1.urn.opendaylight.flow.service.rev130819.FlowTableRef;
 import org.opendaylight.yang.gen.v1.urn.opendaylight.flow.service.rev130819.SalFlowService;
-import org.opendaylight.yang.gen.v1.urn.opendaylight.flow.types.rev131026.Flow;
 import org.opendaylight.yang.gen.v1.urn.opendaylight.flow.types.rev131026.FlowRef;
 import org.opendaylight.yang.gen.v1.urn.opendaylight.flow.types.rev131026.OutputPortValues;
 import org.opendaylight.yang.gen.v1.urn.opendaylight.flow.types.rev131026.flow.InstructionsBuilder;
-import org.opendaylight.yang.gen.v1.urn.opendaylight.flow.types.rev131026.instruction.instruction.WriteActionsCaseBuilder;
-import org.opendaylight.yang.gen.v1.urn.opendaylight.flow.types.rev131026.instruction.instruction.write.actions._case.WriteActionsBuilder;
+import org.opendaylight.yang.gen.v1.urn.opendaylight.flow.types.rev131026.flow.MatchBuilder;
+import org.opendaylight.yang.gen.v1.urn.opendaylight.flow.types.rev131026.instruction.instruction.ApplyActionsCaseBuilder;
+import org.opendaylight.yang.gen.v1.urn.opendaylight.flow.types.rev131026.instruction.instruction.apply.actions._case.ApplyActionsBuilder;
 import org.opendaylight.yang.gen.v1.urn.opendaylight.flow.types.rev131026.instruction.list.InstructionBuilder;
 import org.opendaylight.yang.gen.v1.urn.opendaylight.inventory.rev130819.NodeRef;
 import org.opendaylight.yang.gen.v1.urn.opendaylight.inventory.rev130819.nodes.Node;
@@ -56,8 +60,29 @@ public class OFSwitchTracker implements DataChangeListener {
             FlowCapableNode flowCapableNode = ((Node) elem.getValue()).getAugmentation(FlowCapableNode.class);
             if (flowCapableNode!= null) {
                 LOG.info("identified the OF NODE : {}", elem.getKey());
+                InstanceIdentifier<Node> nodeIID = (InstanceIdentifier<Node>) elem.getKey();
+                InstanceIdentifier<Table> tableRef = getTableInstanceIdentifier(nodeIID);
+                InstanceIdentifier<Flow> flowRef = getFlowInstanceId(tableRef);
+
+                installDefaultFlowRule(nodeIID,
+                        tableRef,
+                        flowRef,
+                        getDefaultPuntToControllerFlow());
             }
         }
+    }
+
+    private InstanceIdentifier<Table> getTableInstanceIdentifier(InstanceIdentifier<Node> nodeIID) {
+
+        return nodeIID.augmentation(FlowCapableNode.class)
+                .child(Table.class, new TableKey((short) 0));
+    }
+
+    private InstanceIdentifier<Flow> getFlowInstanceId(InstanceIdentifier<Table> tableId) {
+        // generate unique flow key
+        FlowId flowId = new FlowId("router-on-stick");
+        FlowKey flowKey = new FlowKey(flowId);
+        return tableId.builder().child(Flow.class, flowKey).build();
     }
 
     public void installDefaultFlowRule(InstanceIdentifier<Node> nodRef,
@@ -92,26 +117,30 @@ public class OFSwitchTracker implements DataChangeListener {
         // Create instruction
         InstructionBuilder instBuilder = new InstructionBuilder();
         instBuilder.setInstruction(
-                new WriteActionsCaseBuilder()
-                .setWriteActions(
-                        new WriteActionsBuilder()
+                new ApplyActionsCaseBuilder()
+                .setApplyActions(
+                        new ApplyActionsBuilder()
                         .setAction(Arrays.asList(actBuilder.build()))
                         .build())
                 .build())
         .setOrder(0);
 
+        // create match field
+        MatchBuilder matchBuilder = new MatchBuilder();
+
         // create flow
         FlowBuilder flowBuilder = new FlowBuilder();
-        flowBuilder.setBufferId(new Long(-1))
+        flowBuilder.setBufferId(0xffffffffL)
         .setInstructions(
                 new InstructionsBuilder()
                 .setInstruction(
                         Arrays.asList(instBuilder.build()))
                 .build()
                 )
-        .setTableId((short)0);
+        .setTableId((short)0)
+        .setPriority(0)
+        .setMatch(matchBuilder.build());
 
         return flowBuilder.build();
     }
-
 }

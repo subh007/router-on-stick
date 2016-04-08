@@ -64,11 +64,6 @@ public class RouterProvider implements BindingAwareProvider, AutoCloseable, Pack
     public RouterProvider(NotificationProviderService notificationProviderService, DataBroker broker) {
         listener = notificationProviderService.registerNotificationListener(this);
         dataBroker = broker;
-
-        dataChangeListener = dataBroker.registerDataChangeListener(LogicalDatastoreType.OPERATIONAL,
-                NODE_IID,
-                new OFSwitchTracker(salFlowService),
-                DataChangeScope.BASE);
     }
 
     @Override
@@ -76,6 +71,11 @@ public class RouterProvider implements BindingAwareProvider, AutoCloseable, Pack
         LOG.info("HelloProvider Session Initiated");
         salFlowService = session.getRpcService(SalFlowService.class);
         addressTable = new ConcurrentHashMap<>();
+
+        dataChangeListener = dataBroker.registerDataChangeListener(LogicalDatastoreType.OPERATIONAL,
+                NODE_IID,
+                new OFSwitchTracker(salFlowService),
+                DataChangeScope.BASE);
     }
 
     @Override
