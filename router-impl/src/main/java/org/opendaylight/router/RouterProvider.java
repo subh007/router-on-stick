@@ -134,6 +134,15 @@ public class RouterProvider implements BindingAwareProvider, AutoCloseable, Pack
                 // decode the vlan header.
                 Header8021q vlanHeader = vlanDecoder(vlanHeaderData);
                 LOG.debug("vlan id : {}", vlanHeader.getVlan().getValue().intValue());
+
+                // Test code to send the packet on output port
+                NodeConnectorRef outputport  = packet.getIngress();
+                InstanceIdentifier<Node> nodeIID = outputport.getValue().firstIdentifierOf(Node.class);
+                InstanceIdentifier<NodeConnector> outportIID = outputport.getValue().firstIdentifierOf(NodeConnector.class);
+
+                sendPacket(nodeIID,
+                        outportIID,
+                        packet.getPayload());
             }
         } catch(PacketSizeException ex) {
             LOG.debug("packet can't be decode.");
@@ -184,7 +193,7 @@ public class RouterProvider implements BindingAwareProvider, AutoCloseable, Pack
         TransmitPacketInputBuilder txBuilder = new TransmitPacketInputBuilder();
         txBuilder.setPayload(data)
         .setNode(new NodeRef(nodeIID))
-        .setIngress(new NodeConnectorRef(ncIID));
+        .setEgress(new NodeConnectorRef(ncIID));
 
         packetProcessingService.transmitPacket(txBuilder.build());
     }
