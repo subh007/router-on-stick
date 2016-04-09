@@ -34,6 +34,7 @@ import org.opendaylight.yang.gen.v1.urn.opendaylight.packet.ethernet.rev140528.e
 import org.opendaylight.yang.gen.v1.urn.opendaylight.packet.ethernet.rev140528.ethernet.packet.received.packet.chain.packet.EthernetPacket;
 import org.opendaylight.yang.gen.v1.urn.opendaylight.packet.ethernet.rev140528.ethernet.packet.received.packet.chain.packet.EthernetPacketBuilder;
 import org.opendaylight.yang.gen.v1.urn.opendaylight.packet.service.rev130709.PacketProcessingListener;
+import org.opendaylight.yang.gen.v1.urn.opendaylight.packet.service.rev130709.PacketProcessingService;
 import org.opendaylight.yang.gen.v1.urn.opendaylight.packet.service.rev130709.PacketReceived;
 import org.opendaylight.yang.gen.v1.urn.opendaylight.params.xml.ns.yang.router.rev150105.AddressMappingElem;
 import org.opendaylight.yang.gen.v1.urn.opendaylight.params.xml.ns.yang.router.rev150105.AddressMappingElemBuilder;
@@ -57,6 +58,7 @@ public class RouterProvider implements BindingAwareProvider, AutoCloseable, Pack
     private DataBroker dataBroker;
     private ConcurrentHashMap<String, AddressMappingElem> addressTable;
     private SalFlowService salFlowService;
+    private PacketProcessingService packetProcessingService;
 
     private static String ROUTER_MAC_ADDRESS="10:20:30:40:50:60";
     private static InstanceIdentifier<Node> NODE_IID = InstanceIdentifier.builder(Nodes.class).child(Node.class).build();
@@ -70,6 +72,7 @@ public class RouterProvider implements BindingAwareProvider, AutoCloseable, Pack
     public void onSessionInitiated(ProviderContext session) {
         LOG.info("HelloProvider Session Initiated");
         salFlowService = session.getRpcService(SalFlowService.class);
+        packetProcessingService = session.getRpcService(PacketProcessingService.class);
         addressTable = new ConcurrentHashMap<>();
 
         dataChangeListener = dataBroker.registerDataChangeListener(LogicalDatastoreType.OPERATIONAL,
@@ -86,6 +89,7 @@ public class RouterProvider implements BindingAwareProvider, AutoCloseable, Pack
         listener = null;
         dataChangeListener = null;
         salFlowService = null;
+        packetProcessingService = null;
     }
 
     @Override
