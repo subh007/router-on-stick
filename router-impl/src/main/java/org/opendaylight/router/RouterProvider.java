@@ -21,7 +21,10 @@ import org.opendaylight.controller.sal.binding.api.BindingAwareBroker.ProviderCo
 import org.opendaylight.controller.sal.binding.api.BindingAwareProvider;
 import org.opendaylight.controller.sal.binding.api.NotificationProviderService;
 import org.opendaylight.yang.gen.v1.urn.opendaylight.flow.service.rev130819.SalFlowService;
+import org.opendaylight.yang.gen.v1.urn.opendaylight.inventory.rev130819.NodeConnectorRef;
+import org.opendaylight.yang.gen.v1.urn.opendaylight.inventory.rev130819.NodeRef;
 import org.opendaylight.yang.gen.v1.urn.opendaylight.inventory.rev130819.Nodes;
+import org.opendaylight.yang.gen.v1.urn.opendaylight.inventory.rev130819.node.NodeConnector;
 import org.opendaylight.yang.gen.v1.urn.opendaylight.inventory.rev130819.nodes.Node;
 import org.opendaylight.yang.gen.v1.urn.opendaylight.packet.arp.rev140528.KnownHardwareType;
 import org.opendaylight.yang.gen.v1.urn.opendaylight.packet.arp.rev140528.KnownOperation;
@@ -36,6 +39,7 @@ import org.opendaylight.yang.gen.v1.urn.opendaylight.packet.ethernet.rev140528.e
 import org.opendaylight.yang.gen.v1.urn.opendaylight.packet.service.rev130709.PacketProcessingListener;
 import org.opendaylight.yang.gen.v1.urn.opendaylight.packet.service.rev130709.PacketProcessingService;
 import org.opendaylight.yang.gen.v1.urn.opendaylight.packet.service.rev130709.PacketReceived;
+import org.opendaylight.yang.gen.v1.urn.opendaylight.packet.service.rev130709.TransmitPacketInputBuilder;
 import org.opendaylight.yang.gen.v1.urn.opendaylight.params.xml.ns.yang.router.rev150105.AddressMappingElem;
 import org.opendaylight.yang.gen.v1.urn.opendaylight.params.xml.ns.yang.router.rev150105.AddressMappingElemBuilder;
 import org.opendaylight.yangtools.concepts.ListenerRegistration;
@@ -165,6 +169,24 @@ public class RouterProvider implements BindingAwareProvider, AutoCloseable, Pack
         LOG.debug("Received packet from the vlan {}", vlanID);
 
         return vlanHeaderBuilder.build();
+    }
+
+    /**
+     * This method sends the packet on given output port
+     * @param nodeIID SwithID
+     * @param ncIID Node connector (ouput port)
+     * @param data packet to transmit
+     */
+    private void sendPacket(InstanceIdentifier<Node> nodeIID,
+            InstanceIdentifier<NodeConnector> ncIID,
+            byte[] data) {
+
+        TransmitPacketInputBuilder txBuilder = new TransmitPacketInputBuilder();
+        txBuilder.setPayload(data)
+        .setNode(new NodeRef(nodeIID))
+        .setIngress(new NodeConnectorRef(ncIID));
+
+        packetProcessingService.transmitPacket(txBuilder.build());
     }
 
     /**
