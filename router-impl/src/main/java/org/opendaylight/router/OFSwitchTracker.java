@@ -96,6 +96,7 @@ public class OFSwitchTracker implements DataChangeListener {
         inputBuilder.setFlowTable(new FlowTableRef(tableRef));
         inputBuilder.setFlowRef(new FlowRef(flowRef));
 
+        // TODO: it returns the future add code for handling it
         // install the flow rule
         salFlowService.addFlow(inputBuilder.build());
     }

@@ -19,6 +19,7 @@ import org.opendaylight.packet.ArpFrame;
 import org.opendaylight.packet.EthernetFrame;
 import org.opendaylight.packet.VlanFrame;
 import org.opendaylight.router.PacketUtil;
+import org.opendaylight.yang.gen.v1.urn.ietf.params.xml.ns.yang.ietf.yang.types.rev100924.MacAddress;
 import org.opendaylight.yang.gen.v1.urn.opendaylight.inventory.rev130819.NodeConnectorRef;
 import org.opendaylight.yang.gen.v1.urn.opendaylight.inventory.rev130819.NodeRef;
 import org.opendaylight.yang.gen.v1.urn.opendaylight.inventory.rev130819.node.NodeConnector;
@@ -77,8 +78,8 @@ public class ProxyArp implements PacketProcessingListener{
                 byte[] vlanHeaderData = Arrays.copyOfRange(rawPacket, ETHER_PACKET_HEADER_SIZE,
                         ETHER_PACKET_HEADER_SIZE + VLAN_PACKET_HEADER_SIZE);
                 byte[] arpheaderData = Arrays.copyOfRange(rawPacket,
-                        ETHER_PACKET_HEADER_SIZE,
-                        ETHER_PACKET_HEADER_SIZE+ARP_PACKET_HEADER_SIZE);
+                        ETHER_PACKET_HEADER_SIZE + VLAN_PACKET_HEADER_SIZE,
+                        ETHER_PACKET_HEADER_SIZE + VLAN_PACKET_HEADER_SIZE + ARP_PACKET_HEADER_SIZE);
 
                 // decode the vlan header and arp header.
                 Header8021q vlanHeader = vlanDecoder(vlanHeaderData);
@@ -89,8 +90,12 @@ public class ProxyArp implements PacketProcessingListener{
                     LOG.debug("received packet is arp packet");
                     ArpPacket arpHeader = arpDecoder(arpheaderData);
                     if(arpHeader != null) {
+
                         processArpRequestPacket(arpHeader, packet.getIngress());
-                        createAndSendArpResponse(etherHeader, vlanHeader, arpHeader);
+                        createAndSendArpResponse(etherHeader,
+                                vlanHeader,
+                                arpHeader,
+                                packet.getIngress());
                     }
                 }
 
@@ -124,9 +129,9 @@ public class ProxyArp implements PacketProcessingListener{
 
                 byte[] data = concateHeaders(ether, vlan, arp);
 
-                sendPacket(nodeIID,
-                        outportIID,
-                        data);
+                //                sendPacket(nodeIID,
+                //                        outportIID,
+                //                        data);
             }
         } catch(PacketSizeException ex) {
             LOG.debug("packet can't be decode.");
@@ -150,11 +155,16 @@ public class ProxyArp implements PacketProcessingListener{
 
     private ArpFrame getArpFrame(ArpPacket arpHeader) {
         ArpFrame arpFrame = new ArpFrame();
-        arpFrame.setOperation((short)arpHeader.getOperation().getIntValue());
-        arpFrame.setSHA(PacketUtil.hexStringToByteArray(arpHeader.getSourceHardwareAddress()));
-        arpFrame.setSPA(PacketUtil.hexStringToByteArray(arpHeader.getSourceProtocolAddress()));
-        arpFrame.setTHA(PacketUtil.hexStringToByteArray(arpHeader.getDestinationHardwareAddress()));
-        arpFrame.setTPA(PacketUtil.hexStringToByteArray(arpHeader.getDestinationProtocolAddress()));
+
+        try {
+            arpFrame.setOperation((short)arpHeader.getOperation().getIntValue());
+            arpFrame.setSHA(PacketUtil.hexStringToByteArray(arpHeader.getSourceHardwareAddress()));
+            arpFrame.setSPA(InetAddress.getByName(arpHeader.getSourceProtocolAddress()).getAddress());
+            arpFrame.setTHA(PacketUtil.hexStringToByteArray(arpHeader.getDestinationHardwareAddress()));
+            arpFrame.setTPA(InetAddress.getByName(arpHeader.getDestinationProtocolAddress()).getAddress());
+        } catch (Exception e) {
+            LOG.debug("exception : {}", e.getMessage());
+        }
 
         return arpFrame;
     }
@@ -185,9 +195,34 @@ public class ProxyArp implements PacketProcessingListener{
      */
     private void createAndSendArpResponse(EthernetPacket receivedEthernet,
             Header8021q reveivedVlan,
-            ArpPacket receivedArp) {
+            ArpPacket receivedArp,
+            NodeConnectorRef ingressPort) {
+        // create Headers to send the packet to the output port
+        // We can use same vlan header
 
-        // create Headers
+        // create ethernet header
+        EthernetPacketBuilder ethernetHeaderBuilder = new EthernetPacketBuilder();
+        ethernetHeaderBuilder.setDestinationMac(receivedEthernet.getSourceMac());
+        ethernetHeaderBuilder.setSourceMac(new MacAddress("01:02:03:04:05:06"));
+        ethernetHeaderBuilder.setEthertype(KnownEtherType.VlanTagged); // hard coded
+
+        // create arp header
+        ArpPacketBuilder arpPacketBuilder = new ArpPacketBuilder();
+        arpPacketBuilder.setDestinationHardwareAddress(receivedArp.getSourceHardwareAddress())
+        .setDestinationProtocolAddress(receivedArp.getSourceProtocolAddress())
+        .setSourceHardwareAddress("01:02:03:04:05:06")
+        .setSourceProtocolAddress(receivedArp.getDestinationProtocolAddress())
+        .setOperation(KnownOperation.Reply);
+
+        byte[] data = concateHeaders(getEtherFrame(ethernetHeaderBuilder.build()),
+                getVlanFrame(reveivedVlan),
+                getArpFrame(arpPacketBuilder.build()));
+
+        NodeConnectorRef outputport  = ingressPort;
+        InstanceIdentifier<Node> nodeIID = outputport.getValue().firstIdentifierOf(Node.class);
+        InstanceIdentifier<NodeConnector> outportIID = outputport.getValue().firstIdentifierOf(NodeConnector.class);
+
+        sendPacket(nodeIID, outportIID, data);
     }
 
     /**
@@ -224,6 +259,7 @@ public class ProxyArp implements PacketProcessingListener{
         }
 
         byte[] ethernetHeaderData = Arrays.copyOfRange(data, 0, ETHER_PACKET_HEADER_SIZE);
+        ethernetPacketBuilder.setSourceMac(new MacAddress(PacketUtil.byteToMacString(Arrays.copyOfRange(data, 6, 12))));
         ethernetPacketBuilder.setEthertype(KnownEtherType.forValue(PacketUtil.byteToInt(Arrays.copyOfRange(ethernetHeaderData, 12,14))));
         return ethernetPacketBuilder.build();
     }
@@ -245,8 +281,8 @@ public class ProxyArp implements PacketProcessingListener{
 
         if(arpBuilder.getHardwareType().equals(KnownHardwareType.Ethernet)) {
             // retrieve the hex string for src and dst mac.
-            arpBuilder.setSourceHardwareAddress(PacketUtil.bytesToHexString(Arrays.copyOfRange(data, 8, 14))); //6 byte
-            arpBuilder.setDestinationHardwareAddress(PacketUtil.bytesToHexString(Arrays.copyOfRange(data, 18, 24))); // 6 byte
+            arpBuilder.setSourceHardwareAddress(PacketUtil.byteToMacString(Arrays.copyOfRange(data, 8, 14))); //6 byte
+            arpBuilder.setDestinationHardwareAddress(PacketUtil.byteToMacString(Arrays.copyOfRange(data, 18, 24))); // 6 byte
         }
 
         if(arpBuilder.getProtocolType().equals(KnownEtherType.Ipv4)) {
@@ -272,7 +308,6 @@ public class ProxyArp implements PacketProcessingListener{
 
         Header8021qBuilder vlanHeaderBuilder = new Header8021qBuilder();
         int vlanID = PacketUtil.byteToInt(PacketUtil.getBitsFromBytes(Arrays.copyOfRange(data, 0, 2), 12));
-        int
         vlanHeaderBuilder.setVlan(new VlanId(new Integer(vlanID)));
         LOG.debug("Received packet from the vlan {}", vlanID);
 

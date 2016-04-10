@@ -22,6 +22,11 @@ public class PacketUtil {
         return Arrays.copyOfRange(data, start, end);
     }
 
+    public static String byteToMacString(byte[] data) {
+        return hexStringToColonSeparatedString(
+                bytesToHexString(data));
+    }
+
     public static String bytesToHexString(byte[] bytes) {
 
         if(bytes == null) {
@@ -45,10 +50,26 @@ public class PacketUtil {
         return ret;
     }
 
+    public static String hexStringToColonSeparatedString(String input) {
+        if(input == null) {
+            return null;
+        }
+        StringBuffer buf = new StringBuffer();
+        for(int i=0 ; i<input.length(); i+=2) {
+            buf.append(input.charAt(i));
+            buf.append(input.charAt(i+1));
+            if(i+2 < input.length())
+                buf.append(":");
+        }
+        return buf.toString();
+    }
+
     public static byte[] hexStringToByteArray(String data) {
         if(data == null) {
             return null;
         }
+
+        data = data.replace(":", "");
 
         byte[] output = new byte[data.length()/2];
         for(int i=0; i<data.length(); i+=2) {
