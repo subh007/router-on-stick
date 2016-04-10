@@ -67,38 +67,31 @@ public class ProxyArp implements PacketProcessingListener{
         byte[] rawPacket = packet.getPayload();
         try {
             EthernetPacket etherHeader = etherPacketDecoder(rawPacket);
+
             if(etherHeader.getEthertype() == KnownEtherType.Arp) {
-                LOG.debug("received the ARP packet.");
+                LOG.debug("received the ARP packet but we don't handle the untagged packet.");
 
-                // create and populate the arpheader.
-                ArpPacket arpHeader = arpDecoder(Arrays.copyOfRange(rawPacket,
-                        ETHER_PACKET_HEADER_SIZE,
-                        ETHER_PACKET_HEADER_SIZE+ARP_PACKET_HEADER_SIZE));
-
-                if(arpHeader != null) {
-                    LOG.info("in_port : {}", packet.getIngress().getValue());
-                    LOG.info("smac {} dmac {} sip {} dip {}", arpHeader.getSourceHardwareAddress(),
-                            arpHeader.getDestinationHardwareAddress(),
-                            arpHeader.getSourceProtocolAddress(),
-                            arpHeader.getDestinationProtocolAddress());
-
-                    AddressMappingElem amElem = new AddressMappingElemBuilder()
-                            .setIp(arpHeader.getSourceProtocolAddress())
-                            .setMac(arpHeader.getSourceHardwareAddress())
-                            .setInPort(packet.getIngress()).build();
-                    addressTable.put(amElem.getIp(), amElem);
-                    LOG.info("address {}", addressTable);
-                }
-            }
-            else if(etherHeader.getEthertype() == KnownEtherType.VlanTagged) {
+            }else if(etherHeader.getEthertype() == KnownEtherType.VlanTagged) {
                 LOG.debug("reveived vlan tagged packet.");
 
                 byte[] vlanHeaderData = Arrays.copyOfRange(rawPacket, ETHER_PACKET_HEADER_SIZE,
                         ETHER_PACKET_HEADER_SIZE + VLAN_PACKET_HEADER_SIZE);
+                byte[] arpheaderData = Arrays.copyOfRange(rawPacket,
+                        ETHER_PACKET_HEADER_SIZE,
+                        ETHER_PACKET_HEADER_SIZE+ARP_PACKET_HEADER_SIZE);
 
-                // decode the vlan header.
+                // decode the vlan header and arp header.
                 Header8021q vlanHeader = vlanDecoder(vlanHeaderData);
-                LOG.debug("vlan id : {}", vlanHeader.getVlan().getValue().intValue());
+
+                if(KnownEtherType.forValue(PacketUtil.byteToInt(Arrays.copyOfRange(vlanHeaderData, 2, 4)))
+                        == KnownEtherType.Arp) {
+
+                    LOG.debug("received packet is arp packet");
+                    ArpPacket arpHeader = arpDecoder(arpheaderData);
+                    if(arpHeader != null) {
+                        processArpRequestPacket(arpHeader, packet.getIngress());
+                    }
+                }
 
                 // Test code to send the packet on output port
                 NodeConnectorRef outputport  = packet.getIngress();
@@ -133,12 +126,34 @@ public class ProxyArp implements PacketProcessingListener{
                 sendPacket(nodeIID,
                         outportIID,
                         data);
-
-
             }
         } catch(PacketSizeException ex) {
             LOG.debug("packet can't be decode.");
         }
+    }
+
+    // This method will populate the address mapping with the data
+    private void processArpRequestPacket(ArpPacket arpHeader, NodeConnectorRef portref) {
+        LOG.info("smac {} dmac {} sip {} dip {}", arpHeader.getSourceHardwareAddress(),
+                arpHeader.getDestinationHardwareAddress(),
+                arpHeader.getSourceProtocolAddress(),
+                arpHeader.getDestinationProtocolAddress());
+
+        AddressMappingElem amElem = new AddressMappingElemBuilder()
+                .setIp(arpHeader.getSourceProtocolAddress())
+                .setMac(arpHeader.getSourceHardwareAddress())
+                .setInPort(portref).build();
+        addressTable.put(amElem.getIp(), amElem);
+        LOG.info("added entry to address table {}", addressTable);
+    }
+    /**
+     * Get the ARP response for the ARP request packet. Arp Response will be
+     * build using self mac address (sub-interface mac address).
+     * @param arpPacket
+     * @return
+     */
+    private byte[] formArpResponse(ArpPacket arpPacket) {
+        return null;
     }
 
     /**
@@ -223,6 +238,7 @@ public class ProxyArp implements PacketProcessingListener{
 
         Header8021qBuilder vlanHeaderBuilder = new Header8021qBuilder();
         int vlanID = PacketUtil.byteToInt(PacketUtil.getBitsFromBytes(Arrays.copyOfRange(data, 0, 2), 12));
+        int
         vlanHeaderBuilder.setVlan(new VlanId(new Integer(vlanID)));
         LOG.debug("Received packet from the vlan {}", vlanID);
 
