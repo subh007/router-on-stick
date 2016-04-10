@@ -8,6 +8,7 @@
 
 package org.opendaylight.router;
 
+import java.io.ByteArrayOutputStream;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.util.Arrays;
@@ -20,6 +21,9 @@ import org.opendaylight.controller.md.sal.common.api.data.LogicalDatastoreType;
 import org.opendaylight.controller.sal.binding.api.BindingAwareBroker.ProviderContext;
 import org.opendaylight.controller.sal.binding.api.BindingAwareProvider;
 import org.opendaylight.controller.sal.binding.api.NotificationProviderService;
+import org.opendaylight.packet.ArpFrame;
+import org.opendaylight.packet.EthernetFrame;
+import org.opendaylight.packet.VlanFrame;
 import org.opendaylight.yang.gen.v1.urn.opendaylight.flow.service.rev130819.SalFlowService;
 import org.opendaylight.yang.gen.v1.urn.opendaylight.inventory.rev130819.NodeConnectorRef;
 import org.opendaylight.yang.gen.v1.urn.opendaylight.inventory.rev130819.NodeRef;
@@ -140,9 +144,45 @@ public class RouterProvider implements BindingAwareProvider, AutoCloseable, Pack
                 InstanceIdentifier<Node> nodeIID = outputport.getValue().firstIdentifierOf(Node.class);
                 InstanceIdentifier<NodeConnector> outportIID = outputport.getValue().firstIdentifierOf(NodeConnector.class);
 
+                // create ARP response packet = ethernet + vlan + arp
+
+                // ARP header
+                ArpFrame arp = new ArpFrame();
+                arp.setOperation((short)2);
+                arp.setSHA(new byte[] {0x01, 0x02, 0x03, 0x04, 0x05, 0x06});
+                arp.setTHA(new byte[] {0x01, 0x02, 0x03, 0x04, 0x05, 0x06});
+                arp.setSPA(new byte[] {0x01, 0x00, 0x00, 0x02});
+                arp.setTPA(new byte[] {0x01, 0x00, 0x00, 0x01});
+
+                // vlan header
+                VlanFrame vlan = new VlanFrame();
+                vlan.setPRI((short)0);
+                vlan.setCFI((short) 0);
+                vlan.setVlanID((short) 100);
+                vlan.setEtherType((short) 0x0800);
+
+                // ethernet header
+                EthernetFrame ether = new EthernetFrame();
+                ether.setEthernetDMAC(new byte[] {0x01, 0x02, 0x03, 0x04, 0x05, 0x06});
+                ether.setEthernetSMAC(new byte[] {0x01, 0x02, 0x03, 0x04, 0x05, 0x06});
+                ether.setEtherType((short) 0x0800);
+
+                byte[] data = null;
+                try {
+                    ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+                    outputStream.write(ether.serialize());
+                    outputStream.write(vlan.serialize());
+                    outputStream.write(arp.serialize());
+                    data = outputStream.toByteArray();
+                } catch (Exception e) {
+                    LOG.error("Exception {}", e.getMessage());
+                }
+
                 sendPacket(nodeIID,
                         outportIID,
-                        packet.getPayload());
+                        data);
+
+
             }
         } catch(PacketSizeException ex) {
             LOG.debug("packet can't be decode.");
