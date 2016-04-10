@@ -25,4 +25,30 @@ module router {
                 type inv:node-connector-ref;
         }
     }
+
+    container subinterfaces {
+        list sub-interface{
+            key "interface";
+
+            leaf interface {
+                type string;
+            }
+
+            leaf vlan {
+                type uint32;
+            }
+
+            leaf ip {
+                type string;  //place holder
+            }
+
+            leaf mac {
+                type string; //place holder
+            }
+
+            list port {
+                type uint32;
+            }
+        }
+    }
 }
