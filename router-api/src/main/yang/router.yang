@@ -46,8 +46,10 @@ module router {
                 type string; //place holder
             }
 
-            list port {
-                type uint32;
+            list ports {  //place holder
+                leaf port {
+                    type uint32;
+                }
             }
         }
     }
