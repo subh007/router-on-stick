@@ -90,6 +90,7 @@ public class ProxyArp implements PacketProcessingListener{
                     ArpPacket arpHeader = arpDecoder(arpheaderData);
                     if(arpHeader != null) {
                         processArpRequestPacket(arpHeader, packet.getIngress());
+                        createAndSendArpResponse(etherHeader, vlanHeader, arpHeader);
                     }
                 }
 
@@ -146,14 +147,47 @@ public class ProxyArp implements PacketProcessingListener{
         addressTable.put(amElem.getIp(), amElem);
         LOG.info("added entry to address table {}", addressTable);
     }
+
+    private ArpFrame getArpFrame(ArpPacket arpHeader) {
+        ArpFrame arpFrame = new ArpFrame();
+        arpFrame.setOperation((short)arpHeader.getOperation().getIntValue());
+        arpFrame.setSHA(PacketUtil.hexStringToByteArray(arpHeader.getSourceHardwareAddress()));
+        arpFrame.setSPA(PacketUtil.hexStringToByteArray(arpHeader.getSourceProtocolAddress()));
+        arpFrame.setTHA(PacketUtil.hexStringToByteArray(arpHeader.getDestinationHardwareAddress()));
+        arpFrame.setTPA(PacketUtil.hexStringToByteArray(arpHeader.getDestinationProtocolAddress()));
+
+        return arpFrame;
+    }
+
+    private VlanFrame getVlanFrame(Header8021q vlanHeader) {
+        VlanFrame vlanFrame = new VlanFrame();
+        vlanFrame.setCFI((short)0);
+        vlanFrame.setPRI((short)0);
+        vlanFrame.setEtherType((short) 0x0806); // Hardcoded for the ARP
+        vlanFrame.setVlanID((short)vlanHeader.getVlan().getValue().intValue());
+
+        return vlanFrame;
+    }
+
+    private EthernetFrame getEtherFrame(EthernetPacket etherHeader) {
+        EthernetFrame etherFrame = new EthernetFrame();
+        etherFrame.setEthernetDMAC(PacketUtil.hexStringToByteArray(etherHeader.getDestinationMac().getValue()));
+        etherFrame.setEthernetSMAC(PacketUtil.hexStringToByteArray(etherHeader.getSourceMac().getValue()));
+        etherFrame.setEtherType((short)0x8100); // hardcoded for vlan
+
+        return etherFrame;
+    }
     /**
      * Get the ARP response for the ARP request packet. Arp Response will be
      * build using self mac address (sub-interface mac address).
      * @param arpPacket
      * @return
      */
-    private byte[] formArpResponse(ArpPacket arpPacket) {
-        return null;
+    private void createAndSendArpResponse(EthernetPacket receivedEthernet,
+            Header8021q reveivedVlan,
+            ArpPacket receivedArp) {
+
+        // create Headers
     }
 
     /**
