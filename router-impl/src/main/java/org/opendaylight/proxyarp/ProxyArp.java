@@ -14,6 +14,7 @@ import java.net.UnknownHostException;
 import java.util.Arrays;
 import java.util.concurrent.ConcurrentHashMap;
 
+import org.opendaylight.controller.liblldp.Packet;
 import org.opendaylight.packet.ArpFrame;
 import org.opendaylight.packet.EthernetFrame;
 import org.opendaylight.packet.VlanFrame;
@@ -119,7 +120,7 @@ public class ProxyArp implements PacketProcessingListener{
                 vlan.setPRI((short)0);
                 vlan.setCFI((short) 0);
                 vlan.setVlanID((short) 100);
-                vlan.setEtherType((short) 0x0800);
+                vlan.setEtherType((short) 0x0806);
 
                 // ethernet header
                 EthernetFrame ether = new EthernetFrame();
@@ -127,16 +128,7 @@ public class ProxyArp implements PacketProcessingListener{
                 ether.setEthernetSMAC(new byte[] {0x01, 0x02, 0x03, 0x04, 0x05, 0x06});
                 ether.setEtherType((short) 0x8100);
 
-                byte[] data = null;
-                try {
-                    ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
-                    outputStream.write(ether.serialize());
-                    outputStream.write(vlan.serialize());
-                    outputStream.write(arp.serialize());
-                    data = outputStream.toByteArray();
-                } catch (Exception e) {
-                    LOG.error("Exception {}", e.getMessage());
-                }
+                byte[] data = concateHeaders(ether, vlan, arp);
 
                 sendPacket(nodeIID,
                         outportIID,
@@ -148,6 +140,26 @@ public class ProxyArp implements PacketProcessingListener{
             LOG.debug("packet can't be decode.");
         }
     }
+
+    /**
+     * This method concate the header byte steam.
+     * @param packets
+     * @return
+     */
+    private byte[] concateHeaders(Packet ...packets) {
+        ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+
+        try {
+            for(Packet packet : packets) {
+                outputStream.write(packet.serialize());
+            }
+        } catch (Exception e) {
+            LOG.error("exception in serializing the packet : {}", e.getMessage());
+        }
+
+        return outputStream.toByteArray();
+    }
+
 
     /**
      * this method return the ethernet from provided data.
