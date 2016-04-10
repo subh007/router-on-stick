@@ -2,6 +2,7 @@ package org.opendaylight.app.test;
 
 import org.junit.Test;
 import org.opendaylight.packet.ArpFrame;
+import org.opendaylight.packet.EthernetFrame;
 import org.opendaylight.packet.VlanFrame;
 import org.opendaylight.router.PacketUtil;
 
@@ -36,6 +37,19 @@ public class PacketSerializerTest {
         } catch(Exception e) {
             System.out.println("received exception " + e.getMessage());
             Assert.fail("Received exception in ARP");
+        }
+    }
+
+    @Test
+    public void testEthernetPacket() {
+        try{
+            EthernetFrame ethernetFrame = new EthernetFrame();
+            ethernetFrame.setEthernetDMAC(new byte[] {0x01, 0x02, 0x03, 0x04, 0x05, 0x06});
+            byte[] packet = ethernetFrame.serialize();
+
+            Assert.assertEquals("010203040506", PacketUtil.bytesToHexString(packet));
+        } catch(Exception e) {
+            Assert.fail("received packet exception.");
         }
     }
 }
