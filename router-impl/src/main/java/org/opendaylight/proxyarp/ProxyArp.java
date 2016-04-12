@@ -19,6 +19,7 @@ import org.opendaylight.packet.ArpFrame;
 import org.opendaylight.packet.EthernetFrame;
 import org.opendaylight.packet.VlanFrame;
 import org.opendaylight.router.PacketUtil;
+import org.opendaylight.yang.gen.v1.urn.ietf.params.xml.ns.yang.ietf.inet.types.rev100924.Ipv4Address;
 import org.opendaylight.yang.gen.v1.urn.ietf.params.xml.ns.yang.ietf.yang.types.rev100924.MacAddress;
 import org.opendaylight.yang.gen.v1.urn.opendaylight.inventory.rev130819.NodeConnectorRef;
 import org.opendaylight.yang.gen.v1.urn.opendaylight.inventory.rev130819.NodeRef;
@@ -34,6 +35,8 @@ import org.opendaylight.yang.gen.v1.urn.opendaylight.packet.ethernet.rev140528.e
 import org.opendaylight.yang.gen.v1.urn.opendaylight.packet.ethernet.rev140528.ethernet.packet.fields.Header8021qBuilder;
 import org.opendaylight.yang.gen.v1.urn.opendaylight.packet.ethernet.rev140528.ethernet.packet.received.packet.chain.packet.EthernetPacket;
 import org.opendaylight.yang.gen.v1.urn.opendaylight.packet.ethernet.rev140528.ethernet.packet.received.packet.chain.packet.EthernetPacketBuilder;
+import org.opendaylight.yang.gen.v1.urn.opendaylight.packet.ipv4.rev140528.ipv4.packet.received.packet.chain.packet.Ipv4Packet;
+import org.opendaylight.yang.gen.v1.urn.opendaylight.packet.ipv4.rev140528.ipv4.packet.received.packet.chain.packet.Ipv4PacketBuilder;
 import org.opendaylight.yang.gen.v1.urn.opendaylight.packet.service.rev130709.PacketProcessingListener;
 import org.opendaylight.yang.gen.v1.urn.opendaylight.packet.service.rev130709.PacketProcessingService;
 import org.opendaylight.yang.gen.v1.urn.opendaylight.packet.service.rev130709.PacketReceived;
@@ -50,6 +53,7 @@ public class ProxyArp implements PacketProcessingListener{
     private static final int ETHER_PACKET_HEADER_SIZE=14;
     private static final int VLAN_PACKET_HEADER_SIZE=4;
     private static final int ARP_PACKET_HEADER_SIZE=28;
+    private static final int IPV4_PACKET_HEADER_SIZE=20;
 
     private ConcurrentHashMap<String, AddressMappingElem> addressTable;
     private PacketProcessingService packetProcessingService;
@@ -84,9 +88,8 @@ public class ProxyArp implements PacketProcessingListener{
 
                 // decode the vlan header and arp header.
                 Header8021q vlanHeader = vlanDecoder(vlanHeaderData);
-
-                if(KnownEtherType.forValue(PacketUtil.byteToInt(Arrays.copyOfRange(vlanHeaderData, 2, 4)))
-                        == KnownEtherType.Arp) {
+                int etherType = PacketUtil.byteToInt(Arrays.copyOfRange(vlanHeaderData, 2, 4));
+                if(KnownEtherType.forValue(etherType) == KnownEtherType.Arp) {
 
                     LOG.debug("received packet is arp packet");
                     ArpPacket arpHeader = arpDecoder(arpheaderData);
@@ -98,6 +101,30 @@ public class ProxyArp implements PacketProcessingListener{
                                 arpHeader,
                                 packet.getIngress());
                     }
+                } else if(KnownEtherType.forValue(etherType) == KnownEtherType.Ipv4) {
+
+                    byte[] ipHeaderData = Arrays.copyOfRange(rawPacket,
+                            ETHER_PACKET_HEADER_SIZE + VLAN_PACKET_HEADER_SIZE,
+                            ETHER_PACKET_HEADER_SIZE + VLAN_PACKET_HEADER_SIZE + IPV4_PACKET_HEADER_SIZE);
+
+                    try{
+                        Ipv4Packet ipHeader = decodeIPv4Header(ipHeaderData);
+                        LOG.info("packet dedode : {}", ipHeader.getDestinationIpv4().getValue());
+                    } catch (Exception e) {
+                        LOG.debug("ip packet decoding exception");
+                    }
+
+                    // Received the ip packet forward the packet in correct port.
+                    // To know the correct port first try to get the destination from
+                    // the learnt arp table.
+                    // If the mapping is not found then flood the packet in the vlan related
+                    // that sub-interfaces ports.
+
+
+
+
+                } else {
+                    LOG.error("Packet type is not supported.");
                 }
 
                 // Test code to send the packet on output port
@@ -137,6 +164,21 @@ public class ProxyArp implements PacketProcessingListener{
         } catch(PacketSizeException ex) {
             LOG.debug("packet can't be decode.");
         }
+    }
+
+    // This method decodes the ipv4 header
+    private Ipv4Packet decodeIPv4Header(byte[] data) throws Exception {
+        if (data.length < IPV4_PACKET_HEADER_SIZE) {
+            throw new PacketSizeException("IPV4 header can't be decoded");
+        }
+
+        Ipv4PacketBuilder ipV4HeaderBuilder = new Ipv4PacketBuilder();
+        Ipv4Address address = new Ipv4Address(
+                InetAddress.getByAddress(
+                        Arrays.copyOfRange(data, 16, 20))
+                .getHostAddress());
+        ipV4HeaderBuilder.setDestinationIpv4(address);
+        return ipV4HeaderBuilder.build();
     }
 
     // This method will populate the address mapping with the data
