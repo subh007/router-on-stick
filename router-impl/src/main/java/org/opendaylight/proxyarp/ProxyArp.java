@@ -55,7 +55,8 @@ public class ProxyArp implements PacketProcessingListener{
     private PacketProcessingService packetProcessingService;
 
     public ProxyArp() {
-        addressTable = new ConcurrentHashMap<>();
+        addressTable = new ConcurrentHashMap<String, AddressMappingElem>();
+
     }
 
     public void setPacketProcessingService(PacketProcessingService packetProcessingSercice) {

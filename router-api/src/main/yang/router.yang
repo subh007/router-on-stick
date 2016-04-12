@@ -35,7 +35,7 @@ module router {
             }
 
             leaf vlan {
-                type uint32;
+                type uint16;
             }
 
             leaf ip {
@@ -46,10 +46,8 @@ module router {
                 type string; //place holder
             }
 
-            list ports {  //place holder
-                leaf port {
-                    type uint32;
-                }
+            leaf-list port{
+                type uint16;
             }
         }
     }

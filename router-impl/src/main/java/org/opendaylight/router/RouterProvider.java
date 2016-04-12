@@ -10,8 +10,10 @@ package org.opendaylight.router;
 
 import org.opendaylight.controller.md.sal.binding.api.DataBroker;
 import org.opendaylight.controller.md.sal.binding.api.DataChangeListener;
+import org.opendaylight.controller.md.sal.binding.api.WriteTransaction;
 import org.opendaylight.controller.md.sal.common.api.data.AsyncDataBroker.DataChangeScope;
 import org.opendaylight.controller.md.sal.common.api.data.LogicalDatastoreType;
+import org.opendaylight.controller.md.sal.common.api.data.TransactionCommitFailedException;
 import org.opendaylight.controller.sal.binding.api.BindingAwareBroker.ProviderContext;
 import org.opendaylight.controller.sal.binding.api.BindingAwareProvider;
 import org.opendaylight.controller.sal.binding.api.NotificationProviderService;
@@ -20,11 +22,19 @@ import org.opendaylight.yang.gen.v1.urn.opendaylight.flow.service.rev130819.SalF
 import org.opendaylight.yang.gen.v1.urn.opendaylight.inventory.rev130819.Nodes;
 import org.opendaylight.yang.gen.v1.urn.opendaylight.inventory.rev130819.nodes.Node;
 import org.opendaylight.yang.gen.v1.urn.opendaylight.packet.service.rev130709.PacketProcessingService;
+import org.opendaylight.yang.gen.v1.urn.opendaylight.params.xml.ns.yang.router.rev150105.Subinterfaces;
+import org.opendaylight.yang.gen.v1.urn.opendaylight.params.xml.ns.yang.router.rev150105.subinterfaces.SubInterface;
+import org.opendaylight.yang.gen.v1.urn.opendaylight.params.xml.ns.yang.router.rev150105.subinterfaces.SubInterfaceBuilder;
+import org.opendaylight.yang.gen.v1.urn.opendaylight.params.xml.ns.yang.router.rev150105.subinterfaces.SubInterfaceKey;
 import org.opendaylight.yangtools.concepts.ListenerRegistration;
 import org.opendaylight.yangtools.yang.binding.InstanceIdentifier;
 import org.opendaylight.yangtools.yang.binding.NotificationListener;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import com.google.common.util.concurrent.CheckedFuture;
+import com.google.common.util.concurrent.FutureCallback;
+import com.google.common.util.concurrent.Futures;
 
 
 public class RouterProvider implements BindingAwareProvider, AutoCloseable {
@@ -59,6 +69,8 @@ public class RouterProvider implements BindingAwareProvider, AutoCloseable {
                 NODE_IID,
                 new OFSwitchTracker(salFlowService),
                 DataChangeScope.BASE);
+
+        populateStaticData();
     }
 
     @Override
@@ -69,6 +81,58 @@ public class RouterProvider implements BindingAwareProvider, AutoCloseable {
         listener = null;
         dataChangeListener = null;
         salFlowService = null;
+    }
+
+    public void populateStaticData() {
+
+        // subinterface 1
+        SubInterface subinterface1 = new SubInterfaceBuilder()
+                .setInterface("veth100")
+                .setVlan(100)
+                .setIp("1.0.0.11")
+                .setMac("00:00:00:00:00:01").build();
+        writeSubinteface(subinterface1,
+                getIdentifier(subinterface1.getInterface()));
+
+        // subinterface 2
+        SubInterface subinterface2 = new SubInterfaceBuilder()
+                .setInterface("veth200")
+                .setVlan(200)
+                .setIp("2.0.0.11")
+                .setMac("00:00:00:00:00:02").build();
+        writeSubinteface(subinterface2,
+                getIdentifier(subinterface2.getInterface()));
+    }
+
+    private void writeSubinteface(SubInterface subinteface,
+            InstanceIdentifier<SubInterface> subinterfaceIID) {
+        WriteTransaction wtx = dataBroker.newWriteOnlyTransaction();
+
+        wtx.merge(LogicalDatastoreType.OPERATIONAL,
+                subinterfaceIID,
+                subinteface);
+        CheckedFuture<Void, TransactionCommitFailedException> future = wtx.submit();
+        Futures.addCallback(future, new FutureCallback<Void>() {
+
+            @Override
+            public void onSuccess(Void result) {
+                LOG.info("write is successful");
+
+            }
+
+            @Override
+            public void onFailure(Throwable t) {
+                LOG.info("write failed");
+
+            }
+        });
+    }
+
+    private InstanceIdentifier<SubInterface> getIdentifier(String interf) {
+        return InstanceIdentifier.create(Subinterfaces.class)
+                .child(SubInterface.class,
+                        new SubInterfaceKey(interf)
+                        );
     }
 }
 
