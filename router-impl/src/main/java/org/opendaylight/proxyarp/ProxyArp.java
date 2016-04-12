@@ -107,8 +107,9 @@ public class ProxyArp implements PacketProcessingListener{
                             ETHER_PACKET_HEADER_SIZE + VLAN_PACKET_HEADER_SIZE,
                             ETHER_PACKET_HEADER_SIZE + VLAN_PACKET_HEADER_SIZE + IPV4_PACKET_HEADER_SIZE);
 
+                    Ipv4Packet ipHeader = null;
                     try{
-                        Ipv4Packet ipHeader = decodeIPv4Header(ipHeaderData);
+                        ipHeader = decodeIPv4Header(ipHeaderData);
                         LOG.info("packet dedode : {}", ipHeader.getDestinationIpv4().getValue());
                     } catch (Exception e) {
                         LOG.debug("ip packet decoding exception");
@@ -120,6 +121,22 @@ public class ProxyArp implements PacketProcessingListener{
                     // If the mapping is not found then flood the packet in the vlan related
                     // that sub-interfaces ports.
 
+                    if(ipHeader != null) {
+                        // first check the destination ip in address table
+                        AddressMappingElem addresEntry = addressTable.get(ipHeader.getDestinationIpv4().getValue());
+                        if(addresEntry != null) {
+                            // setnd the packet in it's port
+                            LOG.debug("entry found {}", addresEntry);
+                            NodeConnectorRef port = addresEntry.getInPort();
+
+                            InstanceIdentifier<Node> nodeIID = port.getValue().firstIdentifierOf(Node.class);
+                            InstanceIdentifier<NodeConnector> outportIID = port.getValue().firstIdentifierOf(NodeConnector.class);
+
+                            sendPacket(nodeIID,
+                                    outportIID,
+                                    packet.getPayload());
+                        }
+                    }
 
 
 
