@@ -95,7 +95,10 @@ public class ProxyArp implements PacketProcessingListener{
                     ArpPacket arpHeader = arpDecoder(arpheaderData);
                     if(arpHeader != null) {
 
-                        processArpRequestPacket(arpHeader, packet.getIngress());
+                        processArpRequestPacket(vlanHeader,
+                                arpHeader,
+                                packet.getIngress());
+
                         createAndSendArpResponse(etherHeader,
                                 vlanHeader,
                                 arpHeader,
@@ -131,6 +134,8 @@ public class ProxyArp implements PacketProcessingListener{
 
                             InstanceIdentifier<Node> nodeIID = port.getValue().firstIdentifierOf(Node.class);
                             InstanceIdentifier<NodeConnector> outportIID = port.getValue().firstIdentifierOf(NodeConnector.class);
+
+                            // before sending the packet re-write the vlan header
 
                             sendPacket(nodeIID,
                                     outportIID,
@@ -199,7 +204,7 @@ public class ProxyArp implements PacketProcessingListener{
     }
 
     // This method will populate the address mapping with the data
-    private void processArpRequestPacket(ArpPacket arpHeader, NodeConnectorRef portref) {
+    private void processArpRequestPacket(Header8021q vlanHeader, ArpPacket arpHeader, NodeConnectorRef portref) {
         LOG.info("smac {} dmac {} sip {} dip {}", arpHeader.getSourceHardwareAddress(),
                 arpHeader.getDestinationHardwareAddress(),
                 arpHeader.getSourceProtocolAddress(),
@@ -208,6 +213,7 @@ public class ProxyArp implements PacketProcessingListener{
         AddressMappingElem amElem = new AddressMappingElemBuilder()
                 .setIp(arpHeader.getSourceProtocolAddress())
                 .setMac(arpHeader.getSourceHardwareAddress())
+                .setVlan(vlanHeader.getVlan().getValue().intValue())
                 .setInPort(portref).build();
         addressTable.put(amElem.getIp(), amElem);
         LOG.info("added entry to address table {}", addressTable);
