@@ -135,11 +135,13 @@ public class ProxyArp implements PacketProcessingListener{
                             InstanceIdentifier<Node> nodeIID = port.getValue().firstIdentifierOf(Node.class);
                             InstanceIdentifier<NodeConnector> outportIID = port.getValue().firstIdentifierOf(NodeConnector.class);
 
-                            // before sending the packet re-write the vlan header
+                            // before sending the packet
+                            // 1. change the ethernet src and destination
+                            // 2. re-write the vlan
 
                             sendPacket(nodeIID,
                                     outportIID,
-                                    packet.getPayload());
+                                    reWriteVlanHeader(packet.getPayload(), addresEntry.getVlan()));
                         }
                     }
 
@@ -185,6 +187,51 @@ public class ProxyArp implements PacketProcessingListener{
             }
         } catch(PacketSizeException ex) {
             LOG.debug("packet can't be decode.");
+        }
+    }
+
+    private byte[] getEtherFrame(String destination, String source) {
+        try {
+            EthernetFrame etherFrame = new EthernetFrame();
+            etherFrame.setEthernetDMAC(PacketUtil.hexStringToByteArray(destination));
+            etherFrame.setEthernetSMAC(PacketUtil.hexStringToByteArray(source));
+            etherFrame.setEtherType((short)0x8100);
+            return etherFrame.serialize();
+        } catch(Exception e) {
+            LOG.info("packet can't be formed");
+            return null;
+        }
+    }
+    /**
+     * This functioni re-writes the the vlan header with supplied
+     * vlan id.
+     * @param packetData
+     * @param vlanID
+     * @return
+     */
+    private byte[] reWriteVlanHeader(byte[] packetData, int vlanID) {
+
+        LOG.debug("received packet : {}", PacketUtil.bytesToHexString(packetData));
+
+        try {
+            byte[] etherData = Arrays.copyOfRange(packetData, 0, ETHER_PACKET_HEADER_SIZE);
+
+            Header8021q vlanHeader = new Header8021qBuilder()
+                    .setVlan(new VlanId(new Integer(vlanID)))
+                    .build();
+            byte[] vlanData = getVlanFrame(vlanHeader, (short) 0x0800).serialize();
+
+            byte[] payload = Arrays.copyOfRange(packetData,
+                    ETHER_PACKET_HEADER_SIZE + VLAN_PACKET_HEADER_SIZE,
+                    packetData.length);
+
+            byte[] arr = concateHeaders(etherData, vlanData, payload);
+            LOG.debug("sent packet : {}", PacketUtil.bytesToHexString(arr));
+
+            return arr;
+        } catch(Exception e) {
+            LOG.error("can't rewrite the vlan header");
+            return null;
         }
     }
 
@@ -243,6 +290,10 @@ public class ProxyArp implements PacketProcessingListener{
         vlanFrame.setVlanID((short)vlanHeader.getVlan().getValue().intValue());
 
         return vlanFrame;
+    }
+
+    private VlanFrame getVlanFrame(Header8021q vlanHeader, short etherType) {
+        return getVlanFrame(vlanHeader).setEtherType(etherType);
     }
 
     private EthernetFrame getEtherFrame(EthernetPacket etherHeader) {
@@ -310,6 +361,20 @@ public class ProxyArp implements PacketProcessingListener{
         return outputStream.toByteArray();
     }
 
+    private byte[] concateHeaders(byte[] ...packets) {
+
+        ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+
+        try {
+            for(byte[] packet: packets) {
+                outputStream.write(packet);
+            }
+        } catch (Exception e) {
+            LOG.error("packet concatation error.");
+        }
+
+        return outputStream.toByteArray();
+    }
 
     /**
      * this method return the ethernet from provided data.
