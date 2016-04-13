@@ -24,6 +24,11 @@ module router {
             description "host is connected to the in-port.";
                 type inv:node-connector-ref;
         }
+
+        leaf vlan {
+            description "assosiated vlan.";
+            type uint16;
+        }
     }
 
     container subinterfaces {
