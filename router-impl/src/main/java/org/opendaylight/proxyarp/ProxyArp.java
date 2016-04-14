@@ -137,11 +137,14 @@ public class ProxyArp implements PacketProcessingListener{
 
                             // before sending the packet
                             // 1. change the ethernet src and destination
+                            byte[] newEtherHeader = getEtherFrame("010203040506", addresEntry.getMac());
                             // 2. re-write the vlan
+                            byte[] data = reWriteVlanHeader(packet.getPayload(), addresEntry.getVlan());
+                            data = PacketUtil.replaceBytes(data, newEtherHeader, 0, newEtherHeader.length);
 
                             sendPacket(nodeIID,
                                     outportIID,
-                                    reWriteVlanHeader(packet.getPayload(), addresEntry.getVlan()));
+                                    data);
                         }
                     }
 
