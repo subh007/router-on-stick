@@ -7,6 +7,7 @@
  */
 package org.opendaylight.router;
 
+import java.io.ByteArrayOutputStream;
 import java.util.Arrays;
 
 import org.slf4j.Logger;
@@ -117,5 +118,20 @@ public class PacketUtil {
             val += (byte)((0x01 & (data >> i)) << i);
         }
         return val;
+    }
+
+    public static byte[] replaceBytes(byte[] destination, byte[] src, int offset, int len) {
+
+        ByteArrayOutputStream outputStrem = new ByteArrayOutputStream();
+        if(offset > 0) {
+            outputStrem.write(destination, 0, offset);
+        }
+
+        outputStrem.write(src, 0, len);
+        outputStrem.write(destination,
+                offset + len,
+                destination.length - offset - len);;
+
+                return outputStrem.toByteArray();
     }
 }
