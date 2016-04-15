@@ -39,8 +39,10 @@ import org.opendaylight.yang.gen.v1.urn.opendaylight.flow.types.rev131026.instru
 import org.opendaylight.yang.gen.v1.urn.opendaylight.flow.types.rev131026.instruction.list.InstructionBuilder;
 import org.opendaylight.yang.gen.v1.urn.opendaylight.inventory.rev130819.NodeConnectorId;
 import org.opendaylight.yang.gen.v1.urn.opendaylight.inventory.rev130819.NodeRef;
+import org.opendaylight.yang.gen.v1.urn.opendaylight.inventory.rev130819.Nodes;
 import org.opendaylight.yang.gen.v1.urn.opendaylight.inventory.rev130819.node.NodeConnector;
 import org.opendaylight.yang.gen.v1.urn.opendaylight.inventory.rev130819.nodes.Node;
+import org.opendaylight.yang.gen.v1.urn.opendaylight.inventory.rev130819.nodes.NodeKey;
 import org.opendaylight.yang.gen.v1.urn.opendaylight.l2.types.rev130827.VlanId;
 import org.opendaylight.yang.gen.v1.urn.opendaylight.model.match.types.rev131026.match.VlanMatchBuilder;
 import org.opendaylight.yang.gen.v1.urn.opendaylight.model.match.types.rev131026.match.layer._3.match.Ipv4MatchBuilder;
@@ -155,10 +157,20 @@ public class OFSwitchTracker implements DataChangeListener {
         return flowBuilder.build();
     }
 
-    static void installNewLearning(Ipv4Address src, Ipv4Address dest, int vlanID, Node node, NodeConnector outport) {
-    }
+    public void createAndInstallLearingFlowRule(Ipv4Address src, Ipv4Address dest,
+            int vlanID, Node node, NodeConnector inport,
+            NodeConnector outport) {
 
-    static Flow createLearningFlow(Ipv4Address src, Ipv4Address dest,
+        InstanceIdentifier<Node> nodeIID = InstanceIdentifier.create(Nodes.class)
+                .child(Node.class, new NodeKey(node.getKey()));
+        InstanceIdentifier<Table> tableIID = getTableInstanceIdentifier(nodeIID);
+        InstanceIdentifier<Flow> flowIID = getFlowInstanceId(tableIID);
+
+        Flow flow = getLearningFlow(src, dest, vlanID, node, inport, outport);
+
+        installDefaultFlowRule(nodeIID, tableIID, flowIID, flow);
+    }
+    static Flow getLearningFlow(Ipv4Address src, Ipv4Address dest,
             int vlanID, Node node, NodeConnector inport,
             NodeConnector outport){
 
