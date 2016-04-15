@@ -15,9 +15,14 @@ import java.util.Arrays;
 import java.util.concurrent.ConcurrentHashMap;
 
 import org.opendaylight.controller.liblldp.Packet;
+import org.opendaylight.controller.md.sal.binding.api.DataBroker;
+import org.opendaylight.controller.md.sal.binding.api.ReadOnlyTransaction;
+import org.opendaylight.controller.md.sal.common.api.data.LogicalDatastoreType;
+import org.opendaylight.controller.md.sal.common.api.data.ReadFailedException;
 import org.opendaylight.packet.ArpFrame;
 import org.opendaylight.packet.EthernetFrame;
 import org.opendaylight.packet.VlanFrame;
+import org.opendaylight.router.OFSwitchTracker;
 import org.opendaylight.router.PacketUtil;
 import org.opendaylight.yang.gen.v1.urn.ietf.params.xml.ns.yang.ietf.inet.types.rev100924.Ipv4Address;
 import org.opendaylight.yang.gen.v1.urn.ietf.params.xml.ns.yang.ietf.yang.types.rev100924.MacAddress;
@@ -47,6 +52,9 @@ import org.opendaylight.yangtools.yang.binding.InstanceIdentifier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.google.common.base.Optional;
+import com.google.common.util.concurrent.CheckedFuture;
+
 public class ProxyArp implements PacketProcessingListener{
 
     private static final Logger LOG = LoggerFactory.getLogger(ProxyArp.class);
@@ -57,6 +65,8 @@ public class ProxyArp implements PacketProcessingListener{
 
     private ConcurrentHashMap<String, AddressMappingElem> addressTable;
     private PacketProcessingService packetProcessingService;
+    private OFSwitchTracker ofSwitchTracker;
+    private DataBroker dataBroker;
 
     public ProxyArp() {
         addressTable = new ConcurrentHashMap<String, AddressMappingElem>();
@@ -65,6 +75,14 @@ public class ProxyArp implements PacketProcessingListener{
 
     public void setPacketProcessingService(PacketProcessingService packetProcessingSercice) {
         this.packetProcessingService = packetProcessingSercice;
+    }
+
+    public void setOFSwitchTracker(OFSwitchTracker ofSwitchTracker) {
+        this.ofSwitchTracker = ofSwitchTracker;
+    }
+
+    public void setDataBroker(DataBroker dataBroker) {
+        this.dataBroker = dataBroker;
     }
 
     @Override
@@ -142,9 +160,27 @@ public class ProxyArp implements PacketProcessingListener{
                             byte[] data = reWriteVlanHeader(packet.getPayload(), addresEntry.getVlan());
                             data = PacketUtil.replaceBytes(data, newEtherHeader, 0, newEtherHeader.length);
 
+                            // install the new flow to handle the next packets.
+                            InstanceIdentifier<Node> nIID = addresEntry.getInPort().getValue().firstIdentifierOf(Node.class);
+
+                            ofSwitchTracker.createAndInstallLearingFlowRule(
+                                    new Ipv4Address(ipHeader.getSourceIpv4().getValue()),
+                                    new Ipv4Address(ipHeader.getDestinationIpv4().getValue()),
+                                    vlanHeader.getVlan().getValue().intValue(),
+                                    addresEntry.getVlan(),
+                                    getNodeFromIID(nIID),
+                                    getNodeConnectorFromIID(packet.getIngress().getValue().firstIdentifierOf(NodeConnector.class)),
+                                    getNodeConnectorFromIID(addresEntry.getInPort().getValue().firstIdentifierOf(NodeConnector.class))
+                                    );
+
                             sendPacket(nodeIID,
                                     outportIID,
                                     data);
+                        } else {
+                            LOG.info("flood the packet");
+                            // Flood the packet to all the input ports
+                            // in destination sub-interface.
+
                         }
                     }
 
@@ -205,6 +241,46 @@ public class ProxyArp implements PacketProcessingListener{
             return null;
         }
     }
+
+
+    public NodeConnectorRef getNodeConnectorRef(InstanceIdentifier<Node> nodeIID, int port) {
+        return null;
+    }
+
+    public Node getNodeFromIID(InstanceIdentifier<Node> nodeIID) {
+        ReadOnlyTransaction rtx = dataBroker.newReadOnlyTransaction();
+        CheckedFuture<Optional<Node>, ReadFailedException> future = rtx.read(LogicalDatastoreType.OPERATIONAL, nodeIID);
+
+        Optional<Node> optional = Optional.absent();
+        try {
+            optional = future.checkedGet();
+            if(optional.isPresent()) {
+                return optional.get();
+            }
+        } catch (ReadFailedException e) {
+            LOG.error("can read the node specified by node iid : {}", nodeIID);
+        }
+        LOG.info("didn't find the node {}", nodeIID);
+        return null;
+    }
+
+    public NodeConnector getNodeConnectorFromIID(InstanceIdentifier<NodeConnector> nodeConnectorIID) {
+        ReadOnlyTransaction rtx = dataBroker.newReadOnlyTransaction();
+        CheckedFuture<Optional<NodeConnector>, ReadFailedException> future = rtx.read(LogicalDatastoreType.OPERATIONAL, nodeConnectorIID);
+
+        Optional<NodeConnector> optional = Optional.absent();
+        try {
+            optional = future.checkedGet();
+            if(optional.isPresent()) {
+                return optional.get();
+            }
+        } catch (ReadFailedException ex) {
+            LOG.info("node connector not found for nodeconnector IID : {}", nodeConnectorIID);
+        }
+
+        LOG.info("node connector not found : {}", nodeConnectorIID);
+        return null;
+    }
     /**
      * This functioni re-writes the the vlan header with supplied
      * vlan id.
@@ -245,11 +321,16 @@ public class ProxyArp implements PacketProcessingListener{
         }
 
         Ipv4PacketBuilder ipV4HeaderBuilder = new Ipv4PacketBuilder();
-        Ipv4Address address = new Ipv4Address(
+        Ipv4Address destination = new Ipv4Address(
                 InetAddress.getByAddress(
                         Arrays.copyOfRange(data, 16, 20))
                 .getHostAddress());
-        ipV4HeaderBuilder.setDestinationIpv4(address);
+        Ipv4Address source = new Ipv4Address(
+                InetAddress.getByAddress(
+                        Arrays.copyOfRange(data, 12, 16))
+                .getHostAddress());
+        ipV4HeaderBuilder.setDestinationIpv4(destination);
+        ipV4HeaderBuilder.setSourceIpv4(source);
         return ipV4HeaderBuilder.build();
     }
 

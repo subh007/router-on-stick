@@ -43,7 +43,10 @@ import org.opendaylight.yang.gen.v1.urn.opendaylight.inventory.rev130819.Nodes;
 import org.opendaylight.yang.gen.v1.urn.opendaylight.inventory.rev130819.node.NodeConnector;
 import org.opendaylight.yang.gen.v1.urn.opendaylight.inventory.rev130819.nodes.Node;
 import org.opendaylight.yang.gen.v1.urn.opendaylight.inventory.rev130819.nodes.NodeKey;
+import org.opendaylight.yang.gen.v1.urn.opendaylight.l2.types.rev130827.EtherType;
 import org.opendaylight.yang.gen.v1.urn.opendaylight.l2.types.rev130827.VlanId;
+import org.opendaylight.yang.gen.v1.urn.opendaylight.model.match.types.rev131026.ethernet.match.fields.EthernetTypeBuilder;
+import org.opendaylight.yang.gen.v1.urn.opendaylight.model.match.types.rev131026.match.EthernetMatchBuilder;
 import org.opendaylight.yang.gen.v1.urn.opendaylight.model.match.types.rev131026.match.VlanMatchBuilder;
 import org.opendaylight.yang.gen.v1.urn.opendaylight.model.match.types.rev131026.match.layer._3.match.Ipv4MatchBuilder;
 import org.opendaylight.yang.gen.v1.urn.opendaylight.model.match.types.rev131026.vlan.match.fields.VlanIdBuilder;
@@ -158,7 +161,7 @@ public class OFSwitchTracker implements DataChangeListener {
     }
 
     public void createAndInstallLearingFlowRule(Ipv4Address src, Ipv4Address dest,
-            int vlanID, Node node, NodeConnector inport,
+            int sVlanID, int dVlanID, Node node, NodeConnector inport,
             NodeConnector outport) {
 
         InstanceIdentifier<Node> nodeIID = InstanceIdentifier.create(Nodes.class)
@@ -166,25 +169,32 @@ public class OFSwitchTracker implements DataChangeListener {
         InstanceIdentifier<Table> tableIID = getTableInstanceIdentifier(nodeIID);
         InstanceIdentifier<Flow> flowIID = getFlowInstanceId(tableIID);
 
-        Flow flow = getLearningFlow(src, dest, vlanID, node, inport, outport);
+        Flow flow = getLearningFlow(src, dest,sVlanID, dVlanID, node, inport, outport);
 
         installDefaultFlowRule(nodeIID, tableIID, flowIID, flow);
     }
     static Flow getLearningFlow(Ipv4Address src, Ipv4Address dest,
-            int vlanID, Node node, NodeConnector inport,
+            int sVlanID, int dVlanID, Node node, NodeConnector inport,
             NodeConnector outport){
 
         FlowBuilder flowBuilder = new FlowBuilder();
 
         // create match criteria
         MatchBuilder matchBuilder = new MatchBuilder();
-        matchBuilder.setInPort(new NodeConnectorId(outport.getId()));
+        matchBuilder.setInPort(new NodeConnectorId(inport.getId()));
+
+        matchBuilder.setEthernetMatch(
+                new EthernetMatchBuilder()
+                .setEthernetType(new EthernetTypeBuilder()
+                        .setType(new EtherType(new Long(0x0800)))
+                        .build())
+                .build());
         matchBuilder.setLayer3Match(
                 new Ipv4MatchBuilder()
                 .setIpv4Source(
-                        new Ipv4Prefix(src.getValue()))
+                        new Ipv4Prefix(src.getValue() + "/32"))
                 .setIpv4Destination(
-                        new Ipv4Prefix(dest.getValue()))
+                        new Ipv4Prefix(dest.getValue() + "/32"))
                 .build()
                 );
         matchBuilder.setVlanMatch(
@@ -192,7 +202,7 @@ public class OFSwitchTracker implements DataChangeListener {
                 .setVlanId(
                         new VlanIdBuilder()
                         .setVlanIdPresent(true)
-                        .setVlanId(new VlanId(new Integer(vlanID)))
+                        .setVlanId(new VlanId(new Integer(sVlanID)))
                         .build())
                 .build()
                 );
@@ -202,7 +212,7 @@ public class OFSwitchTracker implements DataChangeListener {
         rewirteVlanID.setAction(
                 new SetVlanIdActionCaseBuilder()
                 .setSetVlanIdAction(new SetVlanIdActionBuilder()
-                        .setVlanId(new VlanId(new Integer(vlanID)))
+                        .setVlanId(new VlanId(new Integer(dVlanID)))
                         .build()
                         )
                 .build())

@@ -64,13 +64,17 @@ public class RouterProvider implements BindingAwareProvider, AutoCloseable {
 
         salFlowService = session.getRpcService(SalFlowService.class);
         proxyArp.setPacketProcessingService(session.getRpcService(PacketProcessingService.class));
+        OFSwitchTracker ofSwitchTracker = new OFSwitchTracker(salFlowService);
 
         dataChangeListener = dataBroker.registerDataChangeListener(LogicalDatastoreType.OPERATIONAL,
                 NODE_IID,
-                new OFSwitchTracker(salFlowService),
+                ofSwitchTracker,
                 DataChangeScope.BASE);
 
         populateStaticData();
+        proxyArp.setOFSwitchTracker(ofSwitchTracker);
+        proxyArp.setDataBroker(dataBroker);
+
     }
 
     @Override
