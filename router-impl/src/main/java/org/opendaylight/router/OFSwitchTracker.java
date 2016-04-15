@@ -12,9 +12,13 @@ import java.util.Map;
 
 import org.opendaylight.controller.md.sal.binding.api.DataChangeListener;
 import org.opendaylight.controller.md.sal.common.api.data.AsyncDataChangeEvent;
+import org.opendaylight.yang.gen.v1.urn.ietf.params.xml.ns.yang.ietf.inet.types.rev100924.Ipv4Address;
+import org.opendaylight.yang.gen.v1.urn.ietf.params.xml.ns.yang.ietf.inet.types.rev100924.Ipv4Prefix;
 import org.opendaylight.yang.gen.v1.urn.ietf.params.xml.ns.yang.ietf.inet.types.rev100924.Uri;
 import org.opendaylight.yang.gen.v1.urn.opendaylight.action.types.rev131112.action.action.OutputActionCaseBuilder;
+import org.opendaylight.yang.gen.v1.urn.opendaylight.action.types.rev131112.action.action.SetVlanIdActionCaseBuilder;
 import org.opendaylight.yang.gen.v1.urn.opendaylight.action.types.rev131112.action.action.output.action._case.OutputActionBuilder;
+import org.opendaylight.yang.gen.v1.urn.opendaylight.action.types.rev131112.action.action.set.vlan.id.action._case.SetVlanIdActionBuilder;
 import org.opendaylight.yang.gen.v1.urn.opendaylight.action.types.rev131112.action.list.ActionBuilder;
 import org.opendaylight.yang.gen.v1.urn.opendaylight.flow.inventory.rev130819.FlowCapableNode;
 import org.opendaylight.yang.gen.v1.urn.opendaylight.flow.inventory.rev130819.FlowId;
@@ -33,8 +37,14 @@ import org.opendaylight.yang.gen.v1.urn.opendaylight.flow.types.rev131026.flow.M
 import org.opendaylight.yang.gen.v1.urn.opendaylight.flow.types.rev131026.instruction.instruction.ApplyActionsCaseBuilder;
 import org.opendaylight.yang.gen.v1.urn.opendaylight.flow.types.rev131026.instruction.instruction.apply.actions._case.ApplyActionsBuilder;
 import org.opendaylight.yang.gen.v1.urn.opendaylight.flow.types.rev131026.instruction.list.InstructionBuilder;
+import org.opendaylight.yang.gen.v1.urn.opendaylight.inventory.rev130819.NodeConnectorId;
 import org.opendaylight.yang.gen.v1.urn.opendaylight.inventory.rev130819.NodeRef;
+import org.opendaylight.yang.gen.v1.urn.opendaylight.inventory.rev130819.node.NodeConnector;
 import org.opendaylight.yang.gen.v1.urn.opendaylight.inventory.rev130819.nodes.Node;
+import org.opendaylight.yang.gen.v1.urn.opendaylight.l2.types.rev130827.VlanId;
+import org.opendaylight.yang.gen.v1.urn.opendaylight.model.match.types.rev131026.match.VlanMatchBuilder;
+import org.opendaylight.yang.gen.v1.urn.opendaylight.model.match.types.rev131026.match.layer._3.match.Ipv4MatchBuilder;
+import org.opendaylight.yang.gen.v1.urn.opendaylight.model.match.types.rev131026.vlan.match.fields.VlanIdBuilder;
 import org.opendaylight.yangtools.yang.binding.DataObject;
 import org.opendaylight.yangtools.yang.binding.InstanceIdentifier;
 import org.slf4j.Logger;
@@ -141,6 +151,83 @@ public class OFSwitchTracker implements DataChangeListener {
         .setTableId((short)0)
         .setPriority(0)
         .setMatch(matchBuilder.build());
+
+        return flowBuilder.build();
+    }
+
+    static void installNewLearning(Ipv4Address src, Ipv4Address dest, int vlanID, Node node, NodeConnector outport) {
+    }
+
+    static Flow createLearningFlow(Ipv4Address src, Ipv4Address dest,
+            int vlanID, Node node, NodeConnector inport,
+            NodeConnector outport){
+
+        FlowBuilder flowBuilder = new FlowBuilder();
+
+        // create match criteria
+        MatchBuilder matchBuilder = new MatchBuilder();
+        matchBuilder.setInPort(new NodeConnectorId(outport.getId()));
+        matchBuilder.setLayer3Match(
+                new Ipv4MatchBuilder()
+                .setIpv4Source(
+                        new Ipv4Prefix(src.getValue()))
+                .setIpv4Destination(
+                        new Ipv4Prefix(dest.getValue()))
+                .build()
+                );
+        matchBuilder.setVlanMatch(
+                new VlanMatchBuilder()
+                .setVlanId(
+                        new VlanIdBuilder()
+                        .setVlanIdPresent(true)
+                        .setVlanId(new VlanId(new Integer(vlanID)))
+                        .build())
+                .build()
+                );
+
+        // create actions
+        ActionBuilder rewirteVlanID = new ActionBuilder();
+        rewirteVlanID.setAction(
+                new SetVlanIdActionCaseBuilder()
+                .setSetVlanIdAction(new SetVlanIdActionBuilder()
+                        .setVlanId(new VlanId(new Integer(vlanID)))
+                        .build()
+                        )
+                .build())
+        .setOrder(0);
+
+        ActionBuilder outputActionBuilder = new ActionBuilder();
+        outputActionBuilder.setAction(
+                new OutputActionCaseBuilder()
+                .setOutputAction(new OutputActionBuilder()
+                        .setOutputNodeConnector(
+                                new Uri(outport.getId())
+                                )
+                        .build())
+                .build())
+        .setOrder(1);
+
+        // create Instruction
+        InstructionBuilder instructionBuidler = new InstructionBuilder();
+        instructionBuidler.setInstruction(
+                new ApplyActionsCaseBuilder()
+                .setApplyActions(
+                        new ApplyActionsBuilder()
+                        .setAction(Arrays.asList(rewirteVlanID.build(), outputActionBuilder.build()))
+                        .build())
+                .build());
+
+        // create flow
+        flowBuilder.setInstructions(
+                new InstructionsBuilder()
+                .setInstruction(Arrays.asList(instructionBuidler.build()))
+                .build())
+        .setBarrier(true)
+        .setIdleTimeout(new Integer(30))
+        .setBufferId(0xffffffffL)
+        .setMatch(matchBuilder.build())
+        .setPriority(100)
+        .setTableId((short) 0);
 
         return flowBuilder.build();
     }
