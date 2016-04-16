@@ -1,12 +1,13 @@
 # router-on-stick
 
 ## Wikipedia Defination
+---
 > In computing, a "one-armed router", also known as a "router on a stick", is a router that has a single physical or logical connection to a network. A one-armed router is often used to forward traffic between locally attached hosts on separate logical routing domains or to facilitate routing table administration, distribution and relay.
 
 ---
 
 ## Traditional setup for the vlan routing
-
+---
 ![alt text](https://github.com/subh007/router-on-stick/blob/master/diagram/router-on-stick.png)
 
 ## Open Flow based solution for the vlan routing
@@ -15,7 +16,7 @@
 ## Build and run the application
 
 Compile the code:
-
+---
 ```shell
 $ mvn clean install
 ```
@@ -27,7 +28,7 @@ $ ./router-karaf/target/assembly/bin/karaf (required java 8)
 ```
 
 ## Test Topology
-
+---
 ![alt text](https://github.com/subh007/router-on-stick/blob/master/diagram/test-topology.png)
 
 ```shell
@@ -101,5 +102,14 @@ NXST_FLOW reply (xid=0x4):
  cookie=0x0, duration=103.651s, table=0, n_packets=20, n_bytes=1872, idle_age=1, priority=0 actions=CONTROLLER:0
 ```
 
+## License
+---
+Copyright (c) [CURRENT_YEAR] [YOUR_NAME]
+
+Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 
