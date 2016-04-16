@@ -4,19 +4,17 @@
 ---
 > In computing, a "one-armed router", also known as a "router on a stick", is a router that has a single physical or logical connection to a network. A one-armed router is often used to forward traffic between locally attached hosts on separate logical routing domains or to facilitate routing table administration, distribution and relay.
 
----
-
 ## Traditional setup for the vlan routing
 ---
 ![alt text](https://github.com/subh007/router-on-stick/blob/master/diagram/router-on-stick.png)
 
 ## Open Flow based solution for the vlan routing
-
+---
 
 ## Build and run the application
-
-Compile the code:
 ---
+Compile the code:
+
 ```shell
 $ mvn clean install
 ```
@@ -104,7 +102,7 @@ NXST_FLOW reply (xid=0x4):
 
 ## License
 ---
-Copyright (c) [CURRENT_YEAR] [YOUR_NAME]
+Copyright (c) 2016 Subhash Kumar Singh
 
 Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
 
