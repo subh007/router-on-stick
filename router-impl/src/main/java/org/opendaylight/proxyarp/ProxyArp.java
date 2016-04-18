@@ -12,6 +12,7 @@ import java.io.ByteArrayOutputStream;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.util.Arrays;
+import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 
 import org.opendaylight.controller.liblldp.Packet;
@@ -48,6 +49,8 @@ import org.opendaylight.yang.gen.v1.urn.opendaylight.packet.service.rev130709.Pa
 import org.opendaylight.yang.gen.v1.urn.opendaylight.packet.service.rev130709.TransmitPacketInputBuilder;
 import org.opendaylight.yang.gen.v1.urn.opendaylight.params.xml.ns.yang.router.rev150105.AddressMappingElem;
 import org.opendaylight.yang.gen.v1.urn.opendaylight.params.xml.ns.yang.router.rev150105.AddressMappingElemBuilder;
+import org.opendaylight.yang.gen.v1.urn.opendaylight.params.xml.ns.yang.router.rev150105.Subinterfaces;
+import org.opendaylight.yang.gen.v1.urn.opendaylight.params.xml.ns.yang.router.rev150105.subinterfaces.SubInterface;
 import org.opendaylight.yangtools.yang.binding.InstanceIdentifier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -177,10 +180,13 @@ public class ProxyArp implements PacketProcessingListener{
                                     outportIID,
                                     data);
                         } else {
-                            LOG.info("flood the packet");
+                            LOG.info("flood the packet on subinterface: {}",
+                                    getSubInterfaceForIp(
+                                            getSubnetAddress(ipHeader.getDestinationIpv4(), 24)
+                                            )
+                                    );
                             // Flood the packet to all the input ports
                             // in destination sub-interface.
-
                         }
                     }
 
@@ -227,6 +233,47 @@ public class ProxyArp implements PacketProcessingListener{
         } catch(PacketSizeException ex) {
             LOG.debug("packet can't be decode.");
         }
+    }
+
+    private Ipv4Address getSubnetAddress(Ipv4Address ipAddress, int mask) {
+
+        try {
+            InetAddress address = InetAddress.getByName(ipAddress.getValue());
+            byte[] data = address.getAddress();
+            data[4] = (byte) (data[0] & 0x00);
+            return new Ipv4Address(InetAddress.getByAddress(data).getHostAddress());
+        } catch (UnknownHostException e) {
+            // TODO Auto-generated catch block
+            LOG.info("can't convert to ip address.");
+        }
+
+        return null;
+    }
+    private SubInterface getSubInterfaceForIp(Ipv4Address ip) {
+        ReadOnlyTransaction rtx = dataBroker.newReadOnlyTransaction();
+        InstanceIdentifier<Subinterfaces> subInterfacesIID = InstanceIdentifier.create(Subinterfaces.class);
+
+        Optional<Subinterfaces> subinterfacesOpt = Optional.absent();
+
+        CheckedFuture<Optional<Subinterfaces>, ReadFailedException> future
+        = rtx.read(LogicalDatastoreType.OPERATIONAL, subInterfacesIID);
+
+        try {
+            subinterfacesOpt = future.get();
+            return getSubInterfaceForIp(ip, subinterfacesOpt.get().getSubInterface());
+        } catch (Exception e) {
+            LOG.error("not able to read the subinterfaces");
+        }
+        return null;
+    }
+
+    private SubInterface getSubInterfaceForIp(Ipv4Address ip, List<SubInterface> subInterfaces) {
+        for(SubInterface subInt : subInterfaces) {
+            if (subInt.getIp().equals(ip.getValue())) {
+                return subInt;
+            }
+        }
+        return null;
     }
 
     private byte[] getEtherFrame(String destination, String source) {

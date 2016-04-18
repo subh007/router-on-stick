@@ -8,6 +8,8 @@
 
 package org.opendaylight.router;
 
+import java.util.Arrays;
+
 import org.opendaylight.controller.md.sal.binding.api.DataBroker;
 import org.opendaylight.controller.md.sal.binding.api.DataChangeListener;
 import org.opendaylight.controller.md.sal.binding.api.WriteTransaction;
@@ -93,7 +95,8 @@ public class RouterProvider implements BindingAwareProvider, AutoCloseable {
         SubInterface subinterface1 = new SubInterfaceBuilder()
                 .setInterface("veth100")
                 .setVlan(100)
-                .setIp("1.0.0.11")
+                .setIp("1.0.0.0")
+                .setPort(Arrays.asList(new Integer(1)))
                 .setMac("00:00:00:00:00:01").build();
         writeSubinteface(subinterface1,
                 getIdentifier(subinterface1.getInterface()));
@@ -102,7 +105,8 @@ public class RouterProvider implements BindingAwareProvider, AutoCloseable {
         SubInterface subinterface2 = new SubInterfaceBuilder()
                 .setInterface("veth200")
                 .setVlan(200)
-                .setIp("2.0.0.11")
+                .setIp("2.0.0.0")
+                .setPort(Arrays.asList(new Integer(2)))
                 .setMac("00:00:00:00:00:02").build();
         writeSubinteface(subinterface2,
                 getIdentifier(subinterface2.getInterface()));
