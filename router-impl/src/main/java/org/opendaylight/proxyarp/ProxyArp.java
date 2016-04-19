@@ -27,10 +27,16 @@ import org.opendaylight.router.OFSwitchTracker;
 import org.opendaylight.router.PacketUtil;
 import org.opendaylight.yang.gen.v1.urn.ietf.params.xml.ns.yang.ietf.inet.types.rev100924.Ipv4Address;
 import org.opendaylight.yang.gen.v1.urn.ietf.params.xml.ns.yang.ietf.yang.types.rev100924.MacAddress;
+import org.opendaylight.yang.gen.v1.urn.opendaylight.inventory.rev130819.NodeConnectorId;
 import org.opendaylight.yang.gen.v1.urn.opendaylight.inventory.rev130819.NodeConnectorRef;
+import org.opendaylight.yang.gen.v1.urn.opendaylight.inventory.rev130819.NodeId;
 import org.opendaylight.yang.gen.v1.urn.opendaylight.inventory.rev130819.NodeRef;
+import org.opendaylight.yang.gen.v1.urn.opendaylight.inventory.rev130819.Nodes;
 import org.opendaylight.yang.gen.v1.urn.opendaylight.inventory.rev130819.node.NodeConnector;
+import org.opendaylight.yang.gen.v1.urn.opendaylight.inventory.rev130819.node.NodeConnectorBuilder;
+import org.opendaylight.yang.gen.v1.urn.opendaylight.inventory.rev130819.node.NodeConnectorKey;
 import org.opendaylight.yang.gen.v1.urn.opendaylight.inventory.rev130819.nodes.Node;
+import org.opendaylight.yang.gen.v1.urn.opendaylight.inventory.rev130819.nodes.NodeKey;
 import org.opendaylight.yang.gen.v1.urn.opendaylight.packet.arp.rev140528.KnownHardwareType;
 import org.opendaylight.yang.gen.v1.urn.opendaylight.packet.arp.rev140528.KnownOperation;
 import org.opendaylight.yang.gen.v1.urn.opendaylight.packet.arp.rev140528.arp.packet.received.packet.chain.packet.ArpPacket;
@@ -90,7 +96,7 @@ public class ProxyArp implements PacketProcessingListener{
 
     @Override
     public void onPacketReceived(PacketReceived packet) {
-        LOG.debug("reveived the packet :");
+        LOG.debug("reveived the packet : {}", packet);
         byte[] rawPacket = packet.getPayload();
         try {
             EthernetPacket etherHeader = etherPacketDecoder(rawPacket);
@@ -115,15 +121,21 @@ public class ProxyArp implements PacketProcessingListener{
                     LOG.debug("received packet is arp packet");
                     ArpPacket arpHeader = arpDecoder(arpheaderData);
                     if(arpHeader != null) {
+                        //NodeConnector nodeConnector = new NodeConnectorBuilder().setId(packet.getMatch().getInPort()).build();
+
+                        InstanceIdentifier<Node> tNodeIID = InstanceIdentifier.create(Nodes.class).child(Node.class, packet.getIngress().getValue().firstKeyOf(Node.class));
+                        InstanceIdentifier<NodeConnector> ncIID = tNodeIID.child(NodeConnector.class, new NodeConnectorKey(packet.getMatch().getInPort()));
+
+                        NodeConnectorRef ncRef = new NodeConnectorRef(ncIID);
 
                         processArpRequestPacket(vlanHeader,
                                 arpHeader,
-                                packet.getIngress());
+                                ncRef);
 
                         createAndSendArpResponse(etherHeader,
                                 vlanHeader,
                                 arpHeader,
-                                packet.getIngress());
+                                ncRef);
                     }
                 } else if(KnownEtherType.forValue(etherType) == KnownEtherType.Ipv4) {
 
@@ -172,7 +184,7 @@ public class ProxyArp implements PacketProcessingListener{
                                     vlanHeader.getVlan().getValue().intValue(),
                                     addresEntry.getVlan(),
                                     getNodeFromIID(nIID),
-                                    getNodeConnectorFromIID(packet.getIngress().getValue().firstIdentifierOf(NodeConnector.class)),
+                                    new NodeConnectorBuilder().setId(packet.getMatch().getInPort()).build(),
                                     getNodeConnectorFromIID(addresEntry.getInPort().getValue().firstIdentifierOf(NodeConnector.class))
                                     );
 
@@ -180,13 +192,30 @@ public class ProxyArp implements PacketProcessingListener{
                                     outportIID,
                                     data);
                         } else {
-                            LOG.info("flood the packet on subinterface: {}",
-                                    getSubInterfaceForIp(
-                                            getSubnetAddress(ipHeader.getDestinationIpv4(), 24)
-                                            )
-                                    );
+                            LOG.info("flood the packet on subinterface");
+                            SubInterface subInterface = getSubInterfaceForIp(getSubnetAddress(ipHeader.getDestinationIpv4(), 24));
                             // Flood the packet to all the input ports
                             // in destination sub-interface.
+
+                            String nodeKey = packet.getIngress().getValue().firstKeyOf(Node.class).getId().getValue();
+
+                            for (Integer port: subInterface.getPort()) {
+                                NodeConnectorId ncID = new NodeConnectorId(nodeKey + ":" + port.toString());
+
+                                InstanceIdentifier<Node> tNodeIID = InstanceIdentifier.create(Nodes.class).child(Node.class, new NodeKey(new NodeId(nodeKey)));
+                                InstanceIdentifier<NodeConnector> ncIID = tNodeIID.child(NodeConnector.class, new NodeConnectorKey(ncID));
+
+                                // before sending the packet
+                                // 1. change the ethernet src and destination
+                                byte[] newEtherHeader = getEtherFrame("FFFFFFFFFFFF", "010203040506");
+                                // 2. re-write the vlan
+                                byte[] data = reWriteVlanHeader(packet.getPayload(), subInterface.getVlan().intValue());
+                                data = PacketUtil.replaceBytes(data, newEtherHeader, 0, newEtherHeader.length);
+
+                                sendPacket(tNodeIID,
+                                        ncIID,
+                                        data);
+                            }
                         }
                     }
 
@@ -240,7 +269,7 @@ public class ProxyArp implements PacketProcessingListener{
         try {
             InetAddress address = InetAddress.getByName(ipAddress.getValue());
             byte[] data = address.getAddress();
-            data[4] = (byte) (data[0] & 0x00);
+            data[3] = (byte) (data[0] & 0x00);
             return new Ipv4Address(InetAddress.getByAddress(data).getHostAddress());
         } catch (UnknownHostException e) {
             // TODO Auto-generated catch block
