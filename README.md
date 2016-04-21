@@ -99,6 +99,13 @@ NXST_FLOW reply (xid=0x4):
  cookie=0x0, duration=1.943s, table=0, n_packets=1, n_bytes=102, idle_timeout=30, idle_age=0, priority=100,ip,in_port=2,dl_vlan=200,nw_src=2.0.0.1,nw_dst=1.0.0.1 actions=mod_vlan_vid:100,output:1
  cookie=0x0, duration=103.651s, table=0, n_packets=20, n_bytes=1872, idle_age=1, priority=0 actions=CONTROLLER:0
 ```
+## Application Requirements
+
+- Application should able to route the packet over the vlan.
+- Application should get the configuration about the sub-interfaces from the user using the rest apis.
+- Application will forward the packet as per the provided sub-interface ip addresses.
+- Before forwarding the packet to the sub-interface the Application will rewrite the vlan header and mac address.
+- Application should also be able to respond for ARP request (Proxy Arp).
 
 ## License
 ---
