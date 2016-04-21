@@ -46,6 +46,7 @@ public class RouterProvider implements BindingAwareProvider, AutoCloseable {
 
     private ListenerRegistration<NotificationListener> listener;
     private ListenerRegistration<DataChangeListener> dataChangeListener;
+    private ListenerRegistration<DataChangeListener> dataListenerForUserData;
 
     private DataBroker dataBroker;
     private SalFlowService salFlowService;
@@ -58,6 +59,12 @@ public class RouterProvider implements BindingAwareProvider, AutoCloseable {
         proxyArp = new ProxyArp();
         listener = notificationProviderService.registerNotificationListener(proxyArp);
         dataBroker = broker;
+
+        InstanceIdentifier<SubInterface> iid = InstanceIdentifier.create(Subinterfaces.class).child(SubInterface.class);
+        dataListenerForUserData = dataBroker.registerDataChangeListener(LogicalDatastoreType.CONFIGURATION,
+                iid,
+                new UserDataHandler(),
+                DataChangeScope.BASE);
     }
 
     @Override
@@ -83,10 +90,12 @@ public class RouterProvider implements BindingAwareProvider, AutoCloseable {
     public void close() throws Exception {
         this.listener.close();
         dataChangeListener.close();
+        dataListenerForUserData.close();
 
         listener = null;
         dataChangeListener = null;
         salFlowService = null;
+        dataListenerForUserData = null;
     }
 
     public void populateStaticData() {
