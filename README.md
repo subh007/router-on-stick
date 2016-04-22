@@ -119,4 +119,4 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 
 ## Contact
 
-Please feel free to write me your suggestions/ comments/ bugs.
+Please feel free to write me your suggestions/ comments/ bugs. You can write me your suggestion at subh.singh007@gmail.com
