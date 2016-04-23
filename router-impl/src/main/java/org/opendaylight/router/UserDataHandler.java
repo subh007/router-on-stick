@@ -8,6 +8,7 @@
 package org.opendaylight.router;
 
 import java.util.Map;
+import java.util.Set;
 
 import org.opendaylight.controller.md.sal.binding.api.DataChangeListener;
 import org.opendaylight.controller.md.sal.common.api.data.AsyncDataChangeEvent;
@@ -23,6 +24,8 @@ public class UserDataHandler implements DataChangeListener{
     @Override
     public void onDataChanged(AsyncDataChangeEvent<InstanceIdentifier<?>, DataObject> dataChangeNotification) {
         handleCreatedData(dataChangeNotification.getCreatedData());
+        handleUpdatedData(dataChangeNotification.getUpdatedData());
+        handleDeletedData(dataChangeNotification.getRemovedPaths());
     }
 
     public void handleCreatedData(Map<InstanceIdentifier<?>, DataObject> createdData) {
@@ -33,8 +36,8 @@ public class UserDataHandler implements DataChangeListener{
         LOG.info("some data got for update: {}", updatedData);
     }
 
-    public void handleDeletedData(Map<InstanceIdentifier<?>, DataObject> deletedData) {
-        LOG.info("some data got for deletion: {}", deletedData);
+    public void handleDeletedData(Set<InstanceIdentifier<?>> setRemovedpath) {
+        LOG.info("some data got for deletion: {}", setRemovedpath);
     }
 
 }
