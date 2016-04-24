@@ -61,9 +61,12 @@ public class RouterProvider implements BindingAwareProvider, AutoCloseable {
         dataBroker = broker;
 
         InstanceIdentifier<SubInterface> iid = InstanceIdentifier.create(Subinterfaces.class).child(SubInterface.class);
+        UserDataHandler userDataHandler = new UserDataHandler();
+        userDataHandler.setDataBroker(dataBroker);
+
         dataListenerForUserData = dataBroker.registerDataChangeListener(LogicalDatastoreType.CONFIGURATION,
                 iid,
-                new UserDataHandler(),
+                userDataHandler,
                 DataChangeScope.BASE);
     }
 
