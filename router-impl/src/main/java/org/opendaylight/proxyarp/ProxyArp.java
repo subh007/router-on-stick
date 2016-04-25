@@ -115,6 +115,15 @@ public class ProxyArp implements PacketProcessingListener{
 
                 // decode the vlan header and arp header.
                 Header8021q vlanHeader = vlanDecoder(vlanHeaderData);
+
+                // check for the vlan header with the user configuration
+                // if it matches then only process the packet otherwise
+                // drop the packet.
+                if(!isVlanAllowedOnInputPort(vlanHeader.getVlan().getValue().intValue(),
+                        nodeConnectorIDToInt(packet.getMatch().getInPort()))){
+                    return;
+                }
+
                 int etherType = PacketUtil.byteToInt(Arrays.copyOfRange(vlanHeaderData, 2, 4));
                 if(KnownEtherType.forValue(etherType) == KnownEtherType.Arp) {
 
@@ -199,22 +208,24 @@ public class ProxyArp implements PacketProcessingListener{
 
                             String nodeKey = packet.getIngress().getValue().firstKeyOf(Node.class).getId().getValue();
 
-                            for (Integer port: subInterface.getPort()) {
-                                NodeConnectorId ncID = new NodeConnectorId(nodeKey + ":" + port.toString());
+                            if(subInterface != null) {
+                                for (Integer port: subInterface.getPort()) {
+                                    NodeConnectorId ncID = new NodeConnectorId(nodeKey + ":" + port.toString());
 
-                                InstanceIdentifier<Node> tNodeIID = InstanceIdentifier.create(Nodes.class).child(Node.class, new NodeKey(new NodeId(nodeKey)));
-                                InstanceIdentifier<NodeConnector> ncIID = tNodeIID.child(NodeConnector.class, new NodeConnectorKey(ncID));
+                                    InstanceIdentifier<Node> tNodeIID = InstanceIdentifier.create(Nodes.class).child(Node.class, new NodeKey(new NodeId(nodeKey)));
+                                    InstanceIdentifier<NodeConnector> ncIID = tNodeIID.child(NodeConnector.class, new NodeConnectorKey(ncID));
 
-                                // before sending the packet
-                                // 1. change the ethernet src and destination
-                                byte[] newEtherHeader = getEtherFrame("FFFFFFFFFFFF", "010203040506");
-                                // 2. re-write the vlan
-                                byte[] data = reWriteVlanHeader(packet.getPayload(), subInterface.getVlan().intValue());
-                                data = PacketUtil.replaceBytes(data, newEtherHeader, 0, newEtherHeader.length);
+                                    // before sending the packet
+                                    // 1. change the ethernet src and destination
+                                    byte[] newEtherHeader = getEtherFrame("FFFFFFFFFFFF", "010203040506");
+                                    // 2. re-write the vlan
+                                    byte[] data = reWriteVlanHeader(packet.getPayload(), subInterface.getVlan().intValue());
+                                    data = PacketUtil.replaceBytes(data, newEtherHeader, 0, newEtherHeader.length);
 
-                                sendPacket(tNodeIID,
-                                        ncIID,
-                                        data);
+                                    sendPacket(tNodeIID,
+                                            ncIID,
+                                            data);
+                                }
                             }
                         }
                     }
@@ -264,6 +275,29 @@ public class ProxyArp implements PacketProcessingListener{
         }
     }
 
+    private boolean isVlanAllowedOnInputPort(int vlan, int inputport) {
+        ReadOnlyTransaction rtx = dataBroker.newReadOnlyTransaction();
+        InstanceIdentifier<Subinterfaces> subInterfacesIID = InstanceIdentifier.create(Subinterfaces.class);
+
+        Optional<Subinterfaces> subIntfOpt = Optional.absent();
+
+        CheckedFuture<Optional<Subinterfaces>, ReadFailedException> future
+        = rtx.read(LogicalDatastoreType.OPERATIONAL, subInterfacesIID);
+
+        try {
+            subIntfOpt = future.get();
+        } catch (Exception e) {
+            LOG.debug("read failed");
+        }
+
+        for(SubInterface subInterface: subIntfOpt.get().getSubInterface()) {
+            if (subInterface.getVlan().intValue() == vlan && subInterface.getPort().contains(inputport)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     private Ipv4Address getSubnetAddress(Ipv4Address ipAddress, int mask) {
 
         try {
@@ -294,6 +328,18 @@ public class ProxyArp implements PacketProcessingListener{
             LOG.error("not able to read the subinterfaces");
         }
         return null;
+    }
+
+    /**
+     * Convert the NodeconnectorID to int representation.
+     * @param nodeConnectorId
+     * @return
+     */
+    private int nodeConnectorIDToInt(NodeConnectorId nodeConnectorId) {
+        String nodeConnector = nodeConnectorId.getValue();
+        String[] strings = nodeConnector.split(":");
+
+        return Integer.parseInt(strings[strings.length - 1]);
     }
 
     private SubInterface getSubInterfaceForIp(Ipv4Address ip, List<SubInterface> subInterfaces) {

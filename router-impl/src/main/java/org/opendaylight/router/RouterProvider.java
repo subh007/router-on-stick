@@ -120,8 +120,8 @@ public class RouterProvider implements BindingAwareProvider, AutoCloseable {
                 .setIp("2.0.0.0")
                 .setPort(Arrays.asList(new Integer(2)))
                 .setMac("00:00:00:00:00:02").build();
-        writeSubinteface(subinterface2,
-                getIdentifier(subinterface2.getInterface()));
+        //        writeSubinteface(subinterface2,
+        //                getIdentifier(subinterface2.getInterface()));
     }
 
     private void writeSubinteface(SubInterface subinteface,
